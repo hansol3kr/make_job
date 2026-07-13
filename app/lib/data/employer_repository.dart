@@ -72,6 +72,23 @@ class EmployerRepository {
         .stream(primaryKey: ['id']).eq('id', requestId);
     return reqStream.asyncMap((_) => matchingSnapshot(requestId));
   }
+
+  /// 노쇼 신고 → 신뢰도 패널티 + 자동 백필(재매칭). 생성된 백필 오퍼 수 반환.
+  Future<int> reportNoShow(String assignmentId) async {
+    final n = await supabase
+        .rpc('report_no_show', params: {'p_assignment_id': assignmentId});
+    return (n as num).toInt();
+  }
+
+  /// 근로자 평점 제출(더블블라인드).
+  Future<void> submitRating(String assignmentId, int stars,
+          {Map<String, dynamic>? subScores, String? comment}) =>
+      supabase.rpc('submit_rating', params: {
+        'p_assignment_id': assignmentId,
+        'p_stars': stars,
+        'p_sub_scores': subScores,
+        'p_comment': comment,
+      });
 }
 
 final employerRepositoryProvider =

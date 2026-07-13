@@ -91,6 +91,41 @@ class WorkerRepository {
 
   Future<void> checkOut(String assignmentId) =>
       supabase.rpc('check_out', params: {'p_assignment_id': assignmentId});
+
+  /// 본인확인 제출(MVP 스텁: 즉시 승인). identity_verified_at 세팅 → 매칭 대상이 됨.
+  Future<void> submitIdentityVerification({
+    required String realName,
+    String? bank,
+    String? accountRef,
+  }) =>
+      supabase.rpc('submit_identity_verification', params: {
+        'p_real_name': realName,
+        'p_bank': bank,
+        'p_account_ref': accountRef,
+      });
+
+  /// 내 신뢰 요약(점수·등급·인증여부·최근 이벤트·페널티).
+  Future<Map<String, dynamic>> reliabilitySummary() async {
+    final res = await supabase.rpc('my_reliability_summary');
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  /// 확정 배정 취소(임박 취소는 페널티). 백필 오퍼 수 반환.
+  Future<int> cancelAssignment(String assignmentId) async {
+    final res = await supabase
+        .rpc('cancel_assignment', params: {'p_assignment_id': assignmentId});
+    return (res as num).toInt();
+  }
+
+  /// 상호 평점 제출(더블블라인드).
+  Future<void> submitRating(String assignmentId, int stars,
+          {Map<String, dynamic>? subScores, String? comment}) =>
+      supabase.rpc('submit_rating', params: {
+        'p_assignment_id': assignmentId,
+        'p_stars': stars,
+        'p_sub_scores': subScores,
+        'p_comment': comment,
+      });
 }
 
 final workerRepositoryProvider =
@@ -104,4 +139,10 @@ final myOffersProvider = StreamProvider.autoDispose<List<OfferView>>((ref) {
 /// 내 활성 배정.
 final myAssignmentProvider = StreamProvider.autoDispose<Assignment?>((ref) {
   return ref.watch(workerRepositoryProvider).watchMyAssignment();
+});
+
+/// 내 신뢰 요약(점수·등급·인증·페널티). 본인확인/근무 후 refresh로 갱신.
+final myReliabilityProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
+  return ref.watch(workerRepositoryProvider).reliabilitySummary();
 });

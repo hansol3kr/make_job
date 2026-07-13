@@ -10,6 +10,7 @@ import '../features/employer/employer_home_page.dart';
 import '../features/employer/create_request_page.dart';
 import '../features/employer/matching_status_page.dart';
 import '../features/worker/worker_home_page.dart';
+import '../features/worker/identity_verification_page.dart';
 
 /// go_router를 Supabase 인증 상태 변화에 맞춰 갱신하기 위한 브리지.
 class GoRouterRefreshStream extends ChangeNotifier {
@@ -62,5 +63,8 @@ final appRouter = GoRouter(
           MatchingStatusPage(requestId: s.pathParameters['rid']!),
     ),
     GoRoute(path: '/worker', builder: (_, _) => const WorkerHomePage()),
+    GoRoute(
+        path: '/verify-identity',
+        builder: (_, _) => const IdentityVerificationPage()),
   ],
 );

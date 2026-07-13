@@ -33,7 +33,7 @@ class MatchingStatusPage extends ConsumerWidget {
                 style: const TextStyle(color: AppColors.danger)),
           ),
           data: (s) => s.isConfirmed && s.workers.isNotEmpty
-              ? _confirmedView(context, s)
+              ? _confirmedView(context, ref, s)
               : _matchingView(s),
         ),
       ),
@@ -88,7 +88,7 @@ class MatchingStatusPage extends ConsumerWidget {
     );
   }
 
-  Widget _confirmedView(BuildContext context, MatchingSnapshot s) {
+  Widget _confirmedView(BuildContext context, WidgetRef ref, MatchingSnapshot s) {
     final w = s.workers.first;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,6 +148,20 @@ class MatchingStatusPage extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert_rounded),
+                    onSelected: (v) {
+                      if (v == 'noshow') {
+                        _reportNoShow(context, ref, w.assignmentId);
+                      } else if (v == 'rate') {
+                        _rateWorker(context, ref, w.assignmentId);
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'rate', child: Text('평가하기')),
+                      PopupMenuItem(value: 'noshow', child: Text('노쇼 신고')),
+                    ],
+                  ),
                 ],
               ),
               const Divider(height: 28),
@@ -183,6 +197,122 @@ class MatchingStatusPage extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
       ],
+    );
+  }
+
+  Future<void> _reportNoShow(
+      BuildContext context, WidgetRef ref, String assignmentId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('노쇼 신고'),
+        content: const Text(
+            '근로자가 나타나지 않았나요? 신고 시 해당 근로자 신뢰도가 하락하고, 빈자리는 자동으로 백필됩니다.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('닫기')),
+          FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('신고')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final n =
+          await ref.read(employerRepositoryProvider).reportNoShow(assignmentId);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('노쇼 처리됨 · 백필 오퍼 $n건 전송')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('신고 실패: $e')));
+      }
+    }
+  }
+
+  Future<void> _rateWorker(
+      BuildContext context, WidgetRef ref, String assignmentId) async {
+    var stars = 5;
+    final comment = TextEditingController();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              left: 24,
+              right: 24,
+              top: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('근로자는 어땠나요?',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 4),
+              const Text('서로 평가를 남기면 양쪽에 공개돼요 (더블블라인드).',
+                  style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 1; i <= 5; i++)
+                    IconButton(
+                      onPressed: () => setSheet(() => stars = i),
+                      icon: Icon(
+                          i <= stars
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          size: 40,
+                          color: AppColors.warn),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: comment,
+                decoration: const InputDecoration(
+                    hintText: '한줄 후기 (선택)',
+                    prefixIcon: Icon(Icons.rate_review_rounded)),
+                maxLength: 100,
+              ),
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: () async {
+                  try {
+                    await ref
+                        .read(employerRepositoryProvider)
+                        .submitRating(assignmentId, stars,
+                            comment: comment.text.trim().isEmpty
+                                ? null
+                                : comment.text.trim());
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('평가 완료 👏')));
+                    }
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx)
+                          .showSnackBar(SnackBar(content: Text('평가 실패: $e')));
+                    }
+                  }
+                },
+                child: const Text('평가 제출'),
+              ),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('나중에')),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

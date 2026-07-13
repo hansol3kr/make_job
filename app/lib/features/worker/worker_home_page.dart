@@ -97,12 +97,120 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
     setState(() => _busy = true);
     try {
       await ref.read(workerRepositoryProvider).checkOut(a.id);
-      _snack('근무 완료! 수고하셨어요 👏');
+      ref.invalidate(myReliabilityProvider);
+      if (mounted) await _showRatingSheet(a.id);
     } catch (e) {
       _snack('체크아웃 실패: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _cancel(Assignment a) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('배정 취소'),
+        content: const Text(
+            '정말 취소할까요? 근무 시작 2시간 이내 취소는 신뢰도에 영향이 있어요.\n빈자리는 자동으로 다른 분에게 백필됩니다.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('닫기')),
+          FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('취소하기')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(workerRepositoryProvider).cancelAssignment(a.id);
+      ref.invalidate(myReliabilityProvider);
+      _snack('배정을 취소했어요. 빈자리는 백필됩니다.');
+    } catch (e) {
+      _snack('취소 실패: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _showRatingSheet(String assignmentId) async {
+    var stars = 5;
+    final comment = TextEditingController();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              left: 24,
+              right: 24,
+              top: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('오늘 매장은 어땠나요?',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 4),
+              const Text('서로 평가를 남기면 양쪽에 공개돼요 (더블블라인드).',
+                  style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 1; i <= 5; i++)
+                    IconButton(
+                      onPressed: () => setSheet(() => stars = i),
+                      icon: Icon(
+                          i <= stars
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          size: 40,
+                          color: AppColors.warn),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: comment,
+                decoration: const InputDecoration(
+                    hintText: '한줄 후기 (선택)',
+                    prefixIcon: Icon(Icons.rate_review_rounded)),
+                maxLength: 100,
+              ),
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: () async {
+                  try {
+                    await ref.read(workerRepositoryProvider).submitRating(
+                          assignmentId,
+                          stars,
+                          comment: comment.text.trim().isEmpty
+                              ? null
+                              : comment.text.trim(),
+                        );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    _snack('평가 고마워요! 👏');
+                  } catch (e) {
+                    _snack('평가 실패: $e');
+                  }
+                },
+                child: const Text('평가 제출'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('나중에'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _snack(String m) {
@@ -123,6 +231,8 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
   Widget build(BuildContext context) {
     final assignment = ref.watch(myAssignmentProvider).asData?.value;
     final offers = ref.watch(myOffersProvider).asData?.value ?? const [];
+    final rel = ref.watch(myReliabilityProvider).asData?.value;
+    final verified = rel?['identity_verified'] == true;
     final now = DateTime.now();
     final active =
         offers.where((o) => o.expiresAt.isAfter(now)).toList();
@@ -150,7 +260,15 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            _availabilityCard(),
+            if (rel != null && !verified) ...[
+              _verifyGate(),
+              const SizedBox(height: 12),
+            ],
+            _availabilityCard(verified),
+            if (rel != null) ...[
+              const SizedBox(height: 12),
+              _reliabilityBar(rel),
+            ],
             const SizedBox(height: 20),
             Expanded(
               child: assignment != null
@@ -165,7 +283,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
     );
   }
 
-  Widget _availabilityCard() {
+  Widget _availabilityCard(bool verified) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -199,12 +317,94 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
           ),
           Switch(
             value: _available,
-            onChanged: _busy ? null : _toggle,
+            onChanged: (_busy || !verified) ? null : _toggle,
             activeThumbColor: Colors.white,
             activeTrackColor: AppColors.primaryDark,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _verifyGate() {
+    return InkWell(
+      onTap: () => context.push('/verify-identity'),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.warn.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.warn.withValues(alpha: 0.4)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.verified_user_rounded, color: AppColors.warn),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('본인확인이 필요해요',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+                Text('완료하면 실시간 일감을 받을 수 있어요',
+                    style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.warn),
+        ]),
+      ),
+    );
+  }
+
+  Widget _reliabilityBar(Map<String, dynamic> rel) {
+    final score = (rel['reliability'] as num?)?.toDouble() ?? 50.0;
+    final tier = (rel['tier'] as String?) ?? 'standard';
+    final penalties = (rel['penalties'] as List?) ?? const [];
+    final tierLabel = {
+      'top_pro': '탑프로',
+      'verified': '인증',
+      'standard': '일반'
+    }[tier] ?? '일반';
+    final tierColor = tier == 'top_pro'
+        ? AppColors.primary
+        : (tier == 'verified' ? AppColors.accent : AppColors.inkSub);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(children: [
+        const Icon(Icons.shield_rounded, size: 18, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Text('신뢰도 ${score.toStringAsFixed(0)}',
+            style: const TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: tierColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(tierLabel,
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: tierColor)),
+        ),
+        const Spacer(),
+        if (penalties.isNotEmpty)
+          Row(children: [
+            const Icon(Icons.warning_amber_rounded,
+                size: 16, color: AppColors.danger),
+            const SizedBox(width: 4),
+            Text('페널티 ${penalties.length}',
+                style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.w700)),
+          ]),
+      ]),
     );
   }
 
@@ -359,6 +559,14 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
               label: Text(checkedIn ? 'GPS 체크아웃' : 'GPS 체크인'),
             ),
           ),
+          if (!checkedIn) ...[
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _busy ? null : () => _cancel(a),
+              child: const Text('배정 취소',
+                  style: TextStyle(color: AppColors.danger)),
+            ),
+          ],
         ],
       ),
     );
