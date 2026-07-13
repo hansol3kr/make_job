@@ -28,6 +28,13 @@ class AuthRepository {
         type: OtpType.sms,
       );
 
+  /// 소셜 로그인(카카오/구글). 외부 브라우저 → 딥링크(kr.jigeum.jigeum://login-callback)로
+  /// 복귀하면 supabase_flutter가 세션을 자동 수립하고 onAuthStateChange(signedIn) 발생.
+  Future<bool> signInWithOAuth(OAuthProvider provider) => supabase.auth.signInWithOAuth(
+        provider,
+        redirectTo: 'kr.jigeum.jigeum://login-callback',
+      );
+
   Future<void> signOut() => supabase.auth.signOut();
 
   String? get currentUserId => supabase.auth.currentUser?.id;

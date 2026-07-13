@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
+import '../../core/supabase_client.dart';
+import '../../core/logger.dart';
 import '../../data/auth.dart';
 import '../../data/profile_repository.dart';
 
@@ -23,14 +26,68 @@ class _PhoneLoginPageState extends ConsumerState<PhoneLoginPage> {
   bool _busy = false;
   String? _error;
   String _phoneE164 = '';
+  bool _oauthPending = false;
+  StreamSubscription<AuthState>? _authSub;
 
   bool get _isEmployer => widget.role == 'employer';
 
   @override
+  void initState() {
+    super.initState();
+    // 소셜 로그인은 외부 브라우저 → 딥링크 복귀로 세션이 수립되므로,
+    // signedIn 이벤트를 받아 온보딩/홈으로 분기한다.
+    _authSub = supabase.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn && _oauthPending && mounted) {
+        _oauthPending = false;
+        _postLoginNav();
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _authSub?.cancel();
     _phone.dispose();
     _otp.dispose();
     super.dispose();
+  }
+
+  /// 로그인 성공 후 공통 분기: 역할 프로필 없으면 온보딩, 있으면 홈.
+  Future<void> _postLoginNav() async {
+    try {
+      final status = await ref.read(profileRepositoryProvider).onboardingStatus();
+      if (!mounted) return;
+      final needsOnboarding =
+          _isEmployer ? !status.hasEmployerProfile : !status.hasWorkerProfile;
+      context.go(needsOnboarding
+          ? '/onboarding/${widget.role}'
+          : (_isEmployer ? '/employer' : '/worker'));
+    } catch (e, s) {
+      AppLog.e('post_login_nav_failed', error: e, stack: s);
+      if (mounted) setState(() => _error = '로그인 후 이동 실패: $e');
+    }
+  }
+
+  Future<void> _oauth(OAuthProvider provider) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+      _oauthPending = true;
+    });
+    try {
+      await ref.read(authRepositoryProvider).signInWithOAuth(provider);
+      // 이후 흐름은 onAuthStateChange(signedIn) 리스너가 처리.
+    } catch (e, s) {
+      AppLog.e('oauth_failed', context: {'provider': provider.name}, error: e, stack: s);
+      if (mounted) {
+        setState(() {
+          _oauthPending = false;
+          _error = '소셜 로그인 실패: $e';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _sendOtp() async {
@@ -59,15 +116,7 @@ class _PhoneLoginPageState extends ConsumerState<PhoneLoginPage> {
     });
     try {
       await ref.read(authRepositoryProvider).verifyOtp(_phoneE164, _otp.text.trim());
-      final status = await ref.read(profileRepositoryProvider).onboardingStatus();
-      if (!mounted) return;
-      final needsOnboarding =
-          _isEmployer ? !status.hasEmployerProfile : !status.hasWorkerProfile;
-      if (needsOnboarding) {
-        context.go('/onboarding/${widget.role}');
-      } else {
-        context.go(_isEmployer ? '/employer' : '/worker');
-      }
+      await _postLoginNav();
     } on AuthException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
@@ -174,6 +223,33 @@ class _PhoneLoginPageState extends ConsumerState<PhoneLoginPage> {
                 ),
               ),
             ],
+            const SizedBox(height: 24),
+            Row(children: [
+              const Expanded(child: Divider()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text('간편 로그인',
+                    style: TextStyle(fontSize: 12, color: AppColors.inkSub)),
+              ),
+              const Expanded(child: Divider()),
+            ]),
+            const SizedBox(height: 16),
+            _SocialButton(
+              label: '카카오로 시작하기',
+              bg: const Color(0xFFFEE500),
+              fg: const Color(0xFF191600),
+              icon: Icons.chat_bubble_rounded,
+              onTap: _busy ? null : () => _oauth(OAuthProvider.kakao),
+            ),
+            const SizedBox(height: 10),
+            _SocialButton(
+              label: 'Google로 시작하기',
+              bg: Colors.white,
+              fg: const Color(0xFF1F1F1F),
+              icon: Icons.g_mobiledata_rounded,
+              border: true,
+              onTap: _busy ? null : () => _oauth(OAuthProvider.google),
+            ),
             const SizedBox(height: 28),
             Container(
               padding: const EdgeInsets.all(14),
@@ -206,4 +282,51 @@ class _Spinner extends StatelessWidget {
         height: 20,
         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
       );
+}
+
+class _SocialButton extends StatelessWidget {
+  final String label;
+  final Color bg;
+  final Color fg;
+  final IconData icon;
+  final bool border;
+  final VoidCallback? onTap;
+  const _SocialButton({
+    required this.label,
+    required this.bg,
+    required this.fg,
+    required this.icon,
+    required this.onTap,
+    this.border = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: FilledButton(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(
+          backgroundColor: bg,
+          foregroundColor: fg,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: border
+                ? const BorderSide(color: AppColors.line)
+                : BorderSide.none,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 22, color: fg),
+            const SizedBox(width: 8),
+            Text(label,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
 }

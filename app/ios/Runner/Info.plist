@@ -72,5 +72,19 @@
 	<!-- 표준 HTTPS/TLS만 사용 → 수출규정 면제. 매 빌드 TestFlight 규정문항 자동 통과 -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- 소셜 로그인(카카오/구글) OAuth 딥링크 복귀용 URL 스킴 -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>kr.jigeum.jigeum</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kr.jigeum.jigeum</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
