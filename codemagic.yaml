@@ -37,8 +37,8 @@ workflows:
       cocoapods: default
       vars:
         BUNDLE_ID: "kr.jigeum.jigeum"
-        # 앱 레코드 생성 후 App Store Connect의 숫자 Apple ID 로 교체
-        APP_STORE_APPLE_ID: 0000000000
+        # App Store Connect 앱 레코드의 숫자 Apple ID (앱: job_works / kr.jigeum.jigeum)
+        APP_STORE_APPLE_ID: 6790293137
 
     scripts:
       - name: Xcode 프로젝트에 서명 프로필 적용
