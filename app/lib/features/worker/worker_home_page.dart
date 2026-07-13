@@ -42,7 +42,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
       _busy = true;
     });
     try {
-      final loc = currentLocation();
+      final loc = await currentOrFallback();
       await ref
           .read(workerRepositoryProvider)
           .setAvailability(v, lng: loc.lng, lat: loc.lat);
@@ -82,7 +82,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
   Future<void> _checkIn(Assignment a) async {
     setState(() => _busy = true);
     try {
-      final loc = currentLocation();
+      final loc = await currentOrFallback();
       await ref
           .read(workerRepositoryProvider)
           .checkIn(a.id, loc.lng, loc.lat);

@@ -1,6 +1,9 @@
-/// 위치 서비스. M1b는 디바이스/에뮬레이터가 없어 프리셋 좌표로 결정적 테스트.
-/// M2에서 geolocator 실 GPS로 [current] 구현을 교체(인터페이스 유지).
+/// 위치 서비스 — 실 디바이스 GPS(geolocator).
+/// GPS 거부/불가 시 호출부가 지역 선택(regions) 또는 fallback으로 대체.
 library;
+
+import 'package:geolocator/geolocator.dart';
+import '../core/logger.dart';
 
 class GeoPoint {
   final double lng;
@@ -8,21 +11,35 @@ class GeoPoint {
   const GeoPoint(this.lng, this.lat);
 }
 
-class LocationPreset {
-  final String label;
-  final GeoPoint point;
-  final String address;
-  const LocationPreset(this.label, this.point, this.address);
+/// 서울시청 — GPS도 지역선택도 없을 때 최후 fallback(비상용).
+const kFallbackPoint = GeoPoint(126.9780, 37.5665);
+
+/// 실 디바이스 GPS. 위치서비스/권한 확인 포함. 실패·거부 시 null.
+Future<GeoPoint?> currentDeviceLocation() async {
+  try {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      AppLog.w('gps_service_disabled');
+      return null;
+    }
+    var perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) {
+      perm = await Geolocator.requestPermission();
+    }
+    if (perm == LocationPermission.denied ||
+        perm == LocationPermission.deniedForever) {
+      AppLog.w('gps_permission_denied', context: {'perm': perm.name});
+      return null;
+    }
+    final pos = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+    );
+    return GeoPoint(pos.longitude, pos.latitude);
+  } catch (e, s) {
+    AppLog.e('gps_error', error: e, stack: s);
+    return null;
+  }
 }
 
-/// 데모용 프리셋 (강남 기본). 근로자·업주가 같은 지역이면 반경 3km 내 매칭됨.
-const kLocationPresets = <LocationPreset>[
-  LocationPreset('강남역', GeoPoint(127.0276, 37.4979), '서울 강남구 · 강남역 3번출구'),
-  LocationPreset('역삼역', GeoPoint(127.0364, 37.5006), '서울 강남구 · 역삼역'),
-  LocationPreset('선릉역', GeoPoint(127.0489, 37.5045), '서울 강남구 · 선릉역'),
-  LocationPreset('홍대입구역', GeoPoint(126.9236, 37.5563), '서울 마포구 · 홍대입구역'),
-  LocationPreset('판교역', GeoPoint(127.1112, 37.3946), '경기 성남 · 판교역'),
-];
-
-/// 현재 위치. M1b: 기본 프리셋(강남역) 반환. M2: 실 GPS.
-GeoPoint currentLocation() => kLocationPresets.first.point;
+/// GPS 우선, 실패 시 fallback 좌표. (체크인 등 위치가 반드시 필요한 곳에서 사용)
+Future<GeoPoint> currentOrFallback() async =>
+    await currentDeviceLocation() ?? kFallbackPoint;
