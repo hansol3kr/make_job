@@ -31,6 +31,8 @@ workflows:
       # 코드사이닝은 아래 scripts에서 app-store-connect fetch-signing-files --create 로
       # 인증서·프로필을 "없으면 생성"한다. (자동 ios_signing 블록은 기존 프로필이 있어야만
       # 동작해 첫 빌드에서 "No matching profiles found"로 실패 → 명시적 생성 방식으로 전환)
+      groups:
+        - ios_signing                  # Codemagic secure var CERTIFICATE_PRIVATE_KEY (배포 인증서 개인키)
       flutter: 3.44.6                   # 로컬과 동일 버전 고정(재현성)
       xcode: latest
       cocoapods: default
@@ -43,13 +45,11 @@ workflows:
       - name: 배포 인증서·프로비저닝 프로필 생성/가져오기
         script: |
           # integrations.app_store_connect(jigeum_appstore_key)가 ASC 자격증명을 주입.
-          # 첫 빌드라 배포 인증서 자체가 없음 → 인증서 생성엔 RSA 개인키가 필요.
-          # (없으면 "Cannot save Signing Certificates without certificate private key" 실패)
-          openssl genrsa -out /tmp/dist_key.pem 2048
-          # --certificate-key: 이 개인키로 배포 인증서를 새로 만들고, 프로필(--create)도 생성
+          # 배포 인증서 개인키는 Codemagic secure var CERTIFICATE_PRIVATE_KEY(그룹 ios_signing)로
+          # 고정 → 최초 1회 인증서 생성 후 매 빌드 재사용(인증서 개수 한도 방지).
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
-            --certificate-key=@file:/tmp/dist_key.pem \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
             --create
 
       - name: 키체인 초기화 + 인증서 등록
