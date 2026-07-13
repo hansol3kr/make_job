@@ -69,5 +69,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- 표준 HTTPS/TLS만 사용 → 수출규정 면제. 매 빌드 TestFlight 규정문항 자동 통과 -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
