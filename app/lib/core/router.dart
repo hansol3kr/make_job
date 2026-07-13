@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'supabase_client.dart';
+import 'logger.dart';
 import '../features/landing/landing_page.dart';
 import '../features/auth/phone_login_page.dart';
 import '../features/auth/onboarding_page.dart';
@@ -30,6 +31,7 @@ final appRouter = GoRouter(
   refreshListenable:
       GoRouterRefreshStream(supabase.auth.onAuthStateChange),
   redirect: (context, state) {
+    AppLog.setRoute(state.matchedLocation); // 원격 로그에 현재 화면 기록
     final loggedIn = supabase.auth.currentSession != null;
     final loc = state.matchedLocation;
     final isProtected = loc.startsWith('/employer') ||
