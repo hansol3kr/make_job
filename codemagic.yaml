@@ -40,6 +40,9 @@ workflows:
         BUNDLE_ID: "kr.jigeum.jigeum"
         # App Store Connect 앱 레코드의 숫자 Apple ID (앱: job_works / kr.jigeum.jigeum)
         APP_STORE_APPLE_ID: 6790293137
+        # 실기기가 접근할 클라우드 Supabase(서울). publishable 키는 클라이언트 공개키라 커밋 무방.
+        SUPABASE_URL: "https://umwueaahepuynhbkrnme.supabase.co"
+        SUPABASE_PUBLISHABLE_KEY: "sb_publishable_HxePxLiDk8QVdOUEpsXbCg_CEA1p4gA"
 
     scripts:
       - name: 배포 인증서·프로비저닝 프로필 생성/가져오기
@@ -74,6 +77,8 @@ workflows:
           flutter build ipa --release \
             --build-name=1.0.0 \
             --build-number=$BUILD_NUMBER \
+            --dart-define=SUPABASE_URL=$SUPABASE_URL \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY \
             --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
