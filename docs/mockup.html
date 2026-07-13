@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>지금인력 · 핵심 화면 목업 (M0)</title>
+<style>
+  :root{
+    --primary:#2B50E2; --primary-dark:#1B3BB8; --accent:#12B76A;
+    --warn:#F79009; --danger:#F04438; --bg:#F6F7F9; --surface:#fff;
+    --ink:#101828; --sub:#475467; --line:#E4E7EC;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Apple SD Gothic Neo","Malgun Gothic",-apple-system,"Noto Sans KR",sans-serif;
+    background:#0e1116;color:#e7eaf0;padding:28px 18px 60px;-webkit-font-smoothing:antialiased}
+  h1{font-size:22px;font-weight:900;margin-bottom:4px}
+  .sub{color:#9aa4b2;font-size:14px;margin-bottom:24px;line-height:1.5}
+  .strip{display:flex;gap:22px;overflow-x:auto;padding-bottom:18px;scroll-snap-type:x mandatory}
+  .col{flex:0 0 auto;scroll-snap-align:start}
+  .cap{width:300px;color:#c7cdd6;font-size:13px;margin-bottom:10px;font-weight:700}
+  .cap b{color:#fff}
+  .cap span{display:block;color:#8b94a3;font-weight:400;margin-top:2px}
+  /* phone */
+  .phone{width:300px;height:640px;background:var(--bg);border-radius:36px;
+    border:9px solid #05070b;box-shadow:0 18px 50px rgba(0,0,0,.55);overflow:hidden;position:relative}
+  .status{height:34px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 20px;font-size:12px;font-weight:700;color:var(--ink)}
+  .scr{height:calc(100% - 34px);overflow:hidden;padding:8px 18px 18px}
+  .scr.pad0{padding:0}
+  /* bits */
+  .logo{display:flex;align-items:center;gap:10px;margin:6px 0 22px}
+  .logo .mk{width:38px;height:38px;border-radius:11px;background:var(--primary);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:22px}
+  .logo b{font-size:19px;font-weight:900;color:var(--ink)}
+  .hero{font-size:29px;font-weight:900;color:var(--ink);line-height:1.25;letter-spacing:-.5px}
+  .lead{color:var(--sub);font-size:14px;line-height:1.55;margin-top:12px}
+  .rolecard{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);
+    border-radius:18px;padding:18px;margin-top:14px}
+  .rolecard .ic{width:50px;height:50px;border-radius:13px;display:flex;align-items:center;
+    justify-content:center;font-size:26px}
+  .rolecard .t{font-size:17px;font-weight:800;color:var(--ink)}
+  .rolecard .s{font-size:13px;color:var(--sub);margin-top:3px}
+  .chev{margin-left:auto;color:#98a2b3;font-size:22px}
+  .appbar{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:800;color:var(--ink);
+    padding:6px 2px 16px}
+  .appbar .x{font-size:22px;color:#667085}
+  .lbl{font-size:15px;font-weight:800;color:var(--ink);margin:16px 0 10px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{padding:9px 13px;border-radius:22px;border:1px solid var(--line);background:#fff;
+    font-size:13px;font-weight:700;color:var(--sub)}
+  .chip.on{border-color:var(--primary);background:rgba(43,80,226,.10);color:var(--primary)}
+  .row{display:flex;align-items:center;background:#fff;border:1px solid var(--line);
+    border-radius:13px;padding:14px;gap:11px;font-size:14px;font-weight:700;color:var(--ink)}
+  .row .mi{color:var(--primary);font-size:19px}
+  .row .r{margin-left:auto;color:var(--sub);font-size:12px;font-weight:500}
+  .step{display:flex;align-items:center;justify-content:space-between;background:#fff;
+    border:1px solid var(--line);border-radius:13px;padding:8px 14px;margin-top:2px}
+  .step .n{font-size:18px;font-weight:800}
+  .step .b{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#fff;
+    color:var(--primary);font-size:20px;display:flex;align-items:center;justify-content:center}
+  .note{display:flex;gap:10px;align-items:flex-start;border-radius:12px;padding:13px;font-size:12.5px;
+    font-weight:600;line-height:1.5;margin-top:12px}
+  .note.g{background:rgba(18,183,106,.09);color:#0a7a47}
+  .note.b{background:rgba(43,80,226,.07);color:#22305c}
+  .cta{position:absolute;left:18px;right:18px;bottom:18px;height:54px;border-radius:14px;
+    background:var(--primary);color:#fff;font-size:16px;font-weight:800;display:flex;
+    align-items:center;justify-content:center}
+  .center{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center}
+  .spinner{width:66px;height:66px;border-radius:50%;border:6px solid #dfe3ea;border-top-color:var(--primary);
+    animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .big{font-size:21px;font-weight:900;color:var(--ink);line-height:1.35;margin-top:22px}
+  .muted{color:var(--sub);font-size:13px;margin-top:10px}
+  .confirm-ic{width:66px;height:66px;border-radius:50%;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:36px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:16px}
+  .who{display:flex;align-items:center;gap:14px}
+  .ava{width:56px;height:56px;border-radius:50%;background:var(--bg);display:flex;
+    align-items:center;justify-content:center;font-size:28px}
+  .who .nm{font-size:19px;font-weight:800;color:var(--ink)}
+  .who .rt{font-size:13px;color:var(--sub);margin-top:3px}
+  .who .rt b{color:var(--ink)}
+  .stats{display:flex;border-top:1px solid var(--line);margin-top:16px;padding-top:14px}
+  .stats div{flex:1;text-align:center}
+  .stats .v{font-size:15px;font-weight:800;color:var(--ink)}
+  .stats .k{font-size:11px;color:var(--sub);margin-top:3px}
+  .twobtn{display:flex;gap:10px;position:absolute;left:18px;right:18px;bottom:18px}
+  .btn{flex:1;height:52px;border-radius:13px;display:flex;align-items:center;justify-content:center;
+    font-size:15px;font-weight:800}
+  .btn.pri{background:var(--primary);color:#fff}
+  .btn.out{background:#fff;border:1px solid var(--line);color:var(--ink)}
+  /* worker */
+  .avail{display:flex;align-items:center;gap:12px;border-radius:16px;padding:16px;
+    background:var(--accent);color:#fff;margin-bottom:16px}
+  .avail .t{font-size:15px;font-weight:800}
+  .avail .s{font-size:12px;opacity:.92;margin-top:2px}
+  .sw{margin-left:auto;width:46px;height:28px;border-radius:16px;background:var(--primary-dark);position:relative}
+  .sw::after{content:"";position:absolute;right:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff}
+  .offer{background:#fff;border:2px solid var(--primary);border-radius:18px;padding:18px}
+  .otop{display:flex;align-items:center}
+  .timer{background:rgba(240,68,56,.1);color:var(--danger);font-weight:800;font-size:13px;
+    padding:6px 11px;border-radius:20px}
+  .pay{margin-left:auto;font-size:23px;font-weight:900;color:var(--primary)}
+  .pay small{color:var(--sub);font-size:13px;font-weight:600}
+  .store{font-size:19px;font-weight:900;color:var(--ink);margin-top:14px}
+  .storesub{font-size:13px;color:var(--sub);margin-top:3px}
+  .why{background:var(--bg);border-radius:12px;padding:13px;margin-top:14px}
+  .why .l{display:flex;align-items:center;font-size:12.5px;margin:5px 0}
+  .why .l .mi{color:var(--primary);font-size:16px;margin-right:7px}
+  .why .l .k{color:var(--sub);font-weight:600}
+  .why .l .v{margin-left:auto;font-weight:800;color:var(--ink)}
+  .ob{display:flex;gap:10px;margin-top:16px}
+  .ob .btn{height:50px}
+  .nopenalty{text-align:center;color:var(--accent);font-size:12px;margin-top:10px;font-weight:700}
+</style>
+</head>
+<body>
+  <h1>지금인력 · 핵심 화면 목업 (M0)</h1>
+  <p class="sub">Flutter 구현 화면과 1:1 대응 · 좌우로 스크롤하세요 →<br>차별점이 UI에 직접 드러나도록 설계: <b style="color:#fff">확정된 사람 · 자동 백필 · 설명가능 랭킹 · 거절 불이익 없음 · 에스크로</b></p>
+  <div class="strip">
+
+    <!-- 1. Landing -->
+    <div class="col">
+      <div class="cap"><b>① 랜딩 — 역할 선택</b><span>포지셔닝을 첫 문장에</span></div>
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ⌁ 100%</span></div>
+        <div class="scr">
+          <div class="logo"><div class="mk">⚡</div><b>지금인력</b></div>
+          <div class="hero">지원자 말고,<br>확정된 사람.</div>
+          <div class="lead">필요한 순간, 검증된 사람을 실시간으로.<br>못 채우면 자동으로 대체 인력까지.</div>
+          <div class="rolecard"><div class="ic" style="background:rgba(43,80,226,.12)">🧑‍🍳</div>
+            <div><div class="t">사장님이에요</div><div class="s">지금 당장 일손이 필요해요</div></div><div class="chev">›</div></div>
+          <div class="rolecard"><div class="ic" style="background:rgba(18,183,106,.12)">🙋</div>
+            <div><div class="t">일하고 싶어요</div><div class="s">가까운 일감을 실시간으로 받을래요</div></div><div class="chev">›</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Create request -->
+    <div class="col">
+      <div class="cap"><b>② 원터치 요청</b><span>사장님: 카테고리·시간·인원·급여</span></div>
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ⌁ 100%</span></div>
+        <div class="scr">
+          <div class="appbar"><span class="x">‹</span> 지금 사람 찾기</div>
+          <div class="lbl">어떤 일인가요?</div>
+          <div class="chips">
+            <span class="chip on">☕ 카페</span><span class="chip">🏪 편의점</span>
+            <span class="chip">🍽️ 음식점 홀·주방</span><span class="chip">🛍️ 리테일</span><span class="chip">⚡ 긴급 대타</span>
+          </div>
+          <div class="lbl">언제 · 몇 명 · 급여</div>
+          <div class="row"><span class="mi">🕒</span> 오늘 14:00~20:00 <span class="r">6시간</span></div>
+          <div class="step" style="margin-top:8px"><div class="b">−</div><div class="n">1명</div><div class="b">+</div></div>
+          <div class="row" style="margin-top:8px"><span class="mi">₩</span> ₩95,000 <span class="r">세전 · 일용근로소득</span></div>
+          <div class="row" style="margin-top:8px"><span class="mi">📍</span> 강남역 3번출구 <span class="r">반경 3km</span></div>
+          <div class="note g">✅ 못 채우면 자동으로 대체 인력을 찾고, 그래도 실패하면 <b>수수료 0원</b>.</div>
+        </div>
+        <div class="cta">실시간 매칭 시작</div>
+      </div>
+    </div>
+
+    <!-- 3. Confirmed (employer) -->
+    <div class="col">
+      <div class="cap"><b>③ 매칭 → 확정</b><span>지원자 아닌 “확정된 사람”</span></div>
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ⌁ 100%</span></div>
+        <div class="scr">
+          <div class="appbar"><span class="x">✕</span> 확정 완료</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+            <div class="confirm-ic" style="width:40px;height:40px;font-size:22px">✓</div>
+            <div style="font-size:23px;font-weight:900;color:var(--ink)">확정됐어요!</div>
+          </div>
+          <div class="card">
+            <div class="who"><div class="ava">🧑</div>
+              <div><div class="nm">김성실</div>
+                <div class="rt">⭐ <b>92 신뢰도</b> · 완료 128건</div></div></div>
+            <div class="stats">
+              <div><div class="v">340m</div><div class="k">거리</div></div>
+              <div><div class="v">7분</div><div class="k">도착예정</div></div>
+              <div><div class="v">e-근로계약</div><div class="k">계약</div></div>
+            </div>
+          </div>
+          <div class="note b" style="margin-top:16px">🔒 에스크로로 급여가 안전하게 잡혔어요. 근무 완료 시 당일 정산됩니다.</div>
+        </div>
+        <div class="twobtn">
+          <div class="btn out">📞 안심통화</div><div class="btn pri">💬 채팅</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Worker offer -->
+    <div class="col">
+      <div class="cap"><b>④ 근로자 — 오퍼 수신</b><span>설명가능 랭킹 + 거절 불이익 없음</span></div>
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ⌁ 100%</span></div>
+        <div class="scr">
+          <div class="appbar"><span class="x">‹</span> 일감 받기</div>
+          <div class="avail"><span style="font-size:20px">📡</span>
+            <div><div class="t">실시간 일감 받는 중</div><div class="s">가까운 매장 오퍼가 오면 알려드려요</div></div>
+            <div class="sw"></div></div>
+          <div class="offer">
+            <div class="otop"><span class="timer">⏱ 48s</span>
+              <span class="pay">₩95,000 <small>일급</small></span></div>
+            <div class="store">강남 블루보틀</div>
+            <div class="storesub">카페 홀 · 오늘 14:00~20:00 (6시간)</div>
+            <div class="why">
+              <div class="l"><span class="mi">🧭</span><span class="k">거리</span><span class="v">340m (도보 5분)</span></div>
+              <div class="l"><span class="mi">⭐</span><span class="k">매장 평점</span><span class="v">4.8 · 노쇼 없음</span></div>
+              <div class="l"><span class="mi">🛡</span><span class="k">보호</span><span class="v">에스크로 · 당일정산</span></div>
+            </div>
+            <div class="ob"><div class="btn out">지금은 안 함</div><div class="btn pri" style="flex:2">수락</div></div>
+            <div class="nopenalty">거절해도 불이익이 없어요. 신뢰도에 영향 없음 👍</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Worker confirmed -->
+    <div class="col">
+      <div class="cap"><b>⑤ 근로자 — 확정</b><span>e-근로계약 + GPS 체크인</span></div>
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ⌁ 100%</span></div>
+        <div class="scr">
+          <div class="appbar"><span class="x">‹</span> 일감 받기</div>
+          <div class="center">
+            <div class="confirm-ic">✓</div>
+            <div class="big">확정됐어요!</div>
+            <div class="muted">e-근로계약서가 발급됐어요.<br>근무 시작 시 GPS 체크인하세요.</div>
+          </div>
+        </div>
+        <div class="cta">확인</div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

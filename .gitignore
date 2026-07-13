@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.*
+*.log
+build/
+.dart_tool/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+supabase/.branches/
+supabase/.temp/
+
+# 비밀값 — App Store Connect API 키(.p8) 등. 절대 커밋 금지.
+secrets/
+*.p8

@@ -1,0 +1,72 @@
+# =============================================================================
+# Codemagic CI/CD — Mac 없이 iOS 빌드·서명·TestFlight 업로드
+# 문서: docs/ios-release.md (활성화 절차 · 채워야 할 값)
+#
+# 동작 원리:
+#   Linux/Windows에서 코드를 GitHub에 push → Codemagic 클라우드 macOS(M2)가
+#   flutter build ipa로 컴파일 + 자동 코드사이닝 + App Store Connect 업로드.
+#   내 Mac은 0대 필요. (개인 무료 500분/월 macOS)
+#
+# 활성화 전 준비(전부 Codemagic UI/웹, Mac 불필요):
+#   1) App Store Connect → Users and Access → Integrations → App Store Connect API 키 발급(Admin/App Manager)
+#   2) Codemagic → Teams/Personal → Integrations → App Store Connect 에 그 키 등록
+#      → 아래 `app_store_connect:` 값(<ASC_API_KEY_NAME>)을 등록한 키 이름과 일치시킴
+#   3) App Store Connect에서 앱 레코드 생성(Bundle ID: kr.jigeum.jigeum)
+#      → 생성된 숫자 Apple ID 를 아래 APP_STORE_APPLE_ID 에 기입
+# =============================================================================
+
+workflows:
+  ios-testflight:
+    name: iOS · TestFlight 배포
+    max_build_duration: 60
+    instance_type: mac_mini_m2          # 무료 500분/월 대상 머신
+    working_directory: app              # Flutter 프로젝트가 모노레포의 app/ 안에 있음
+
+    integrations:
+      # ↓ Codemagic UI에 등록한 App Store Connect API 키 "이름"과 정확히 일치해야 함
+      #   (secrets/appstore/credentials.env 의 CODEMAGIC_KEY_NAME 과 동일한 이름 사용)
+      app_store_connect: jigeum_appstore_key
+
+    environment:
+      # 자동 코드사이닝: 인증서·프로비저닝을 Codemagic이 API 키로 생성/관리 (Mac·수동작업 불필요)
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: kr.jigeum.jigeum
+      flutter: 3.44.6                   # 로컬과 동일 버전 고정(재현성)
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "kr.jigeum.jigeum"
+        # 앱 레코드 생성 후 App Store Connect의 숫자 Apple ID 로 교체
+        APP_STORE_APPLE_ID: 0000000000
+
+    scripts:
+      - name: Xcode 프로젝트에 서명 프로필 적용
+        script: xcode-project use-profiles
+
+      - name: Flutter 패키지 설치
+        script: flutter pub get
+
+      - name: CocoaPods 설치
+        script: find . -name "Podfile" -execdir pod install \;
+
+      - name: IPA 빌드 (+ 빌드번호 자동 증가)
+        script: |
+          # TestFlight의 최신 빌드번호 +1 로 자동 증가 (충돌 방지)
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+          BUILD_NUMBER=$(( LATEST + 1 ))
+          flutter build ipa --release \
+            --build-name=1.0.0 \
+            --build-number=$BUILD_NUMBER \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true      # 내부 테스터에게 배포
+        # submit_to_app_store: false    # 실제 스토어 심사 자동제출은 준비되면 켜기
