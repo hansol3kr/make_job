@@ -28,10 +28,9 @@ workflows:
       app_store_connect: jigeum_appstore_key
 
     environment:
-      # 자동 코드사이닝: 인증서·프로비저닝을 Codemagic이 API 키로 생성/관리 (Mac·수동작업 불필요)
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: kr.jigeum.jigeum
+      # 코드사이닝은 아래 scripts에서 app-store-connect fetch-signing-files --create 로
+      # 인증서·프로필을 "없으면 생성"한다. (자동 ios_signing 블록은 기존 프로필이 있어야만
+      # 동작해 첫 빌드에서 "No matching profiles found"로 실패 → 명시적 생성 방식으로 전환)
       flutter: 3.44.6                   # 로컬과 동일 버전 고정(재현성)
       xcode: latest
       cocoapods: default
@@ -41,6 +40,19 @@ workflows:
         APP_STORE_APPLE_ID: 6790293137
 
     scripts:
+      - name: 배포 인증서·프로비저닝 프로필 가져오기 (없으면 생성)
+        script: |
+          # integrations.app_store_connect(jigeum_appstore_key)가 ASC 자격증명을 주입.
+          # --create: 배포 인증서/프로필이 없으면 API로 새로 생성 (첫 빌드 대응)
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+
+      - name: 키체인 초기화 + 인증서 등록
+        script: |
+          keychain initialize
+          keychain add-certificates
+
       - name: Xcode 프로젝트에 서명 프로필 적용
         script: xcode-project use-profiles
 
