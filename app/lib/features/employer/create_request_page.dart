@@ -73,6 +73,9 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
     if (s.contains('no_location')) {
       return '매장 위치가 없어요. 매장 정보를 먼저 등록해 주세요.';
     }
+    if (s.contains('below_minimum_wage')) {
+      return '급여가 최저임금(2026년 시급 10,320원)에 못 미쳐요. 근무시간 대비 급여를 올려주세요.';
+    }
     return '요청 생성 실패: $e';
   }
 
