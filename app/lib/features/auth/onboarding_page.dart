@@ -6,6 +6,7 @@ import '../../core/logger.dart';
 import '../../data/location_service.dart';
 import '../../data/region_repository.dart';
 import '../../data/profile_repository.dart';
+import '../../data/consent_repository.dart';
 
 /// 온보딩: 역할별 프로필 생성. 위치는 실 GPS 우선, 없으면 전국 지역(시/도→시/군/구) 선택.
 class OnboardingPage extends ConsumerStatefulWidget {
@@ -119,6 +120,17 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 법적 필수 동의 게이트: 확인 중이면 로더, 미동의면 동의 화면으로 보낸다.
+    final consentAsync = ref.watch(consentRequiredMetProvider);
+    if (consentAsync.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (consentAsync.value != true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/consent/${widget.role}');
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final regionsAsync = ref.watch(regionsProvider);
     return Scaffold(
       appBar: AppBar(title: Text(_isEmployer ? '매장 정보' : '내 정보')),

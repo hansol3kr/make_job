@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/logger.dart';
 import '../../core/theme.dart';
+import '../../core/supabase_client.dart';
 import '../../data/models.dart';
 import '../../data/employer_repository.dart';
+import '../common/safety_widgets.dart';
+import '../common/dispute_sheet.dart';
 
 /// 실시간 매칭 상태: 매칭중(오퍼 전송) → 확정(배정 근로자 카드).
 class MatchingStatusPage extends ConsumerWidget {
@@ -91,9 +94,12 @@ class MatchingStatusPage extends ConsumerWidget {
 
   Widget _confirmedView(BuildContext context, WidgetRef ref, MatchingSnapshot s) {
     final w = s.workers.first;
+    final myId = supabase.auth.currentUser?.id ?? '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        SosBanner(assignmentId: w.assignmentId, myUserId: myId),
+        LiveLocationCard(assignmentId: w.assignmentId, myUserId: myId),
         Row(
           children: [
             Container(
@@ -156,11 +162,14 @@ class MatchingStatusPage extends ConsumerWidget {
                         _reportNoShow(context, ref, w.assignmentId);
                       } else if (v == 'rate') {
                         _rateWorker(context, ref, w.assignmentId);
+                      } else if (v == 'dispute') {
+                        showDisputeSheet(context, w.assignmentId);
                       }
                     },
                     itemBuilder: (_) => const [
                       PopupMenuItem(value: 'rate', child: Text('평가하기')),
                       PopupMenuItem(value: 'noshow', child: Text('노쇼 신고')),
+                      PopupMenuItem(value: 'dispute', child: Text('문제 신고 / 분쟁')),
                     ],
                   ),
                 ],
@@ -177,13 +186,23 @@ class MatchingStatusPage extends ConsumerWidget {
           ),
         ),
         const Spacer(),
+        OutlinedButton.icon(
+          onPressed: () => context.push('/contract/${w.assignmentId}'),
+          icon: const Icon(Icons.description_outlined),
+          label: const Text('근로계약서 보기·서명'),
+          style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48)),
+        ),
+        const SizedBox(height: 10),
+        SosButton(assignmentId: w.assignmentId),
+        const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.call_rounded),
-                label: const Text('안심통화'),
+                onPressed: () => context.push('/chat/${w.assignmentId}'),
+                icon: const Icon(Icons.chat_bubble_outline_rounded),
+                label: const Text('채팅'),
               ),
             ),
             const SizedBox(width: 12),

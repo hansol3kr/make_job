@@ -12,6 +12,10 @@ import '../features/employer/matching_status_page.dart';
 import '../features/worker/worker_home_page.dart';
 import '../features/worker/identity_verification_page.dart';
 import '../features/worker/professional_registration_page.dart';
+import '../features/worker/history_page.dart';
+import '../features/auth/consent_agreement_page.dart';
+import '../features/common/chat_page.dart';
+import '../features/common/contract_page.dart';
 
 /// go_router를 Supabase 인증 상태 변화에 맞춰 갱신하기 위한 브리지.
 class GoRouterRefreshStream extends ChangeNotifier {
@@ -38,7 +42,9 @@ final appRouter = GoRouter(
     final loc = state.matchedLocation;
     final isProtected = loc.startsWith('/employer') ||
         loc.startsWith('/worker') ||
-        loc.startsWith('/onboarding');
+        loc.startsWith('/onboarding') ||
+        loc.startsWith('/chat') ||
+        loc.startsWith('/contract');
     // 미로그인 상태에서 보호 경로 접근 → 랜딩으로
     if (!loggedIn && isProtected) return '/';
     return null;
@@ -70,5 +76,19 @@ final appRouter = GoRouter(
     GoRoute(
         path: '/register-professional',
         builder: (_, _) => const ProfessionalRegistrationPage()),
+    GoRoute(path: '/history', builder: (_, _) => const HistoryPage()),
+    GoRoute(
+      path: '/consent/:role',
+      builder: (_, s) =>
+          ConsentAgreementPage(role: s.pathParameters['role'] ?? 'worker'),
+    ),
+    GoRoute(
+      path: '/chat/:aid',
+      builder: (_, s) => ChatPage(assignmentId: s.pathParameters['aid']!),
+    ),
+    GoRoute(
+      path: '/contract/:aid',
+      builder: (_, s) => ContractPage(assignmentId: s.pathParameters['aid']!),
+    ),
   ],
 );

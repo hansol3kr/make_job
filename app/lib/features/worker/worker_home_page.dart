@@ -4,10 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/logger.dart';
 import '../../core/theme.dart';
+import '../../core/supabase_client.dart';
 import '../../data/auth.dart';
 import '../../data/models.dart';
 import '../../data/location_service.dart';
 import '../../data/worker_repository.dart';
+import '../../data/contract_repository.dart';
+import '../../data/safety_repository.dart';
+import '../common/safety_widgets.dart';
+import '../common/dispute_sheet.dart';
 
 /// 근로자 홈: 가용 토글 → 실시간 오퍼 수신 → 수락/거절 → 체크인/아웃.
 class WorkerHomePage extends ConsumerStatefulWidget {
@@ -21,6 +26,8 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
   bool _available = false;
   bool _busy = false;
   Timer? _ticker;
+  Timer? _locShareTimer; // 근무 중 위치 공유 주기 전송
+  String? _sharingAid;
 
   @override
   void initState() {
@@ -34,7 +41,44 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _locShareTimer?.cancel();
     super.dispose();
+  }
+
+  /// 배정 상태에 따라 위치 공유 시작/중지. checked_in 동안만 15초마다 전송.
+  void _syncLocationSharing(Assignment? a) {
+    final shouldShare = a != null && a.status == 'checked_in';
+    if (shouldShare) {
+      if (_sharingAid == a.id && _locShareTimer != null) return; // 이미 공유 중
+      _sharingAid = a.id;
+      _locShareTimer?.cancel();
+      _shareLocationOnce(a.id); // 즉시 1회
+      _locShareTimer = Timer.periodic(
+          const Duration(seconds: 15), (_) => _shareLocationOnce(a.id));
+    } else if (_locShareTimer != null) {
+      _locShareTimer!.cancel();
+      _locShareTimer = null;
+      final prev = _sharingAid;
+      _sharingAid = null;
+      if (prev != null) {
+        ref
+            .read(safetyRepositoryProvider)
+            .stopLiveLocation(prev)
+            .catchError((_) {});
+      }
+    }
+  }
+
+  Future<void> _shareLocationOnce(String aid) async {
+    final loc = await currentDeviceLocation();
+    if (loc == null || !mounted) return;
+    try {
+      await ref
+          .read(safetyRepositoryProvider)
+          .updateLiveLocation(aid, loc.lat, loc.lng);
+    } catch (_) {
+      // 위치 공유 실패는 조용히 무시(다음 틱에 재시도).
+    }
   }
 
   Future<void> _toggle(bool v) async {
@@ -96,10 +140,20 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
     } catch (e, s) {
       AppLog.e('check_in_failed',
           context: {'assignment_id': a.id}, error: e, stack: s);
-      _snack('체크인 실패: $e');
+      _snack(_checkInErrorMessage(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// 체크인 오류를 사용자 친화 메시지로. 근무지 반경 밖이면 거리를 안내.
+  String _checkInErrorMessage(Object e) {
+    final s = e.toString();
+    final m = RegExp(r'too_far_from_site:(\d+)').firstMatch(s);
+    if (m != null) {
+      return '근무지에서 약 ${m.group(1)}m 떨어져 있어요. 근무지 근처에서 다시 시도해주세요.';
+    }
+    return '체크인 실패: $e';
   }
 
   Future<void> _checkOut(Assignment a) async {
@@ -247,6 +301,8 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
   @override
   Widget build(BuildContext context) {
     final assignment = ref.watch(myAssignmentProvider).asData?.value;
+    // 근무(checked_in) 동안 위치 공유 시작/중지(idempotent, 가드로 중복 방지).
+    _syncLocationSharing(assignment);
     final offers = ref.watch(myOffersProvider).asData?.value ?? const [];
     final rel = ref.watch(myReliabilityProvider).asData?.value;
     final verified = rel?['identity_verified'] == true;
@@ -263,6 +319,11 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
           onPressed: () => context.go('/'),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.receipt_long_rounded),
+            tooltip: '내 활동 내역',
+            onPressed: () => context.push('/history'),
+          ),
           IconButton(
             icon: const Icon(Icons.logout_rounded),
             tooltip: '로그아웃',
@@ -413,7 +474,9 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
     final score = (rel['reliability'] as num?)?.toDouble() ?? 50.0;
     final tier = (rel['tier'] as String?) ?? 'standard';
     final isPro = rel['professional'] == true;
-    final penalties = (rel['penalties'] as List?) ?? const [];
+    final penalties = ((rel['penalties'] as List?) ?? const [])
+        .map((e) => PenaltyView.fromMap((e as Map).cast<String, dynamic>()))
+        .toList();
     final tierLabel = {
       'top_pro': '탑프로',
       'verified': '인증',
@@ -467,18 +530,191 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
         ],
         const Spacer(),
         if (penalties.isNotEmpty)
-          Row(children: [
-            const Icon(Icons.warning_amber_rounded,
-                size: 16, color: AppColors.danger),
-            const SizedBox(width: 4),
-            Text('페널티 ${penalties.length}',
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.danger,
-                    fontWeight: FontWeight.w700)),
-          ]),
+          InkWell(
+            onTap: () => _showPenaltySheet(penalties),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.warning_amber_rounded,
+                    size: 16, color: AppColors.danger),
+                const SizedBox(width: 4),
+                Text('페널티 ${penalties.length}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.danger,
+                        fontWeight: FontWeight.w700)),
+                const Icon(Icons.chevron_right_rounded,
+                    size: 15, color: AppColors.danger),
+              ]),
+            ),
+          ),
       ]),
     );
+  }
+
+  static const _penaltyKindLabels = {
+    'no_show': '노쇼 (근무 미이행)',
+    'late_cancel': '근무 임박 취소',
+    'declined': '거절',
+  };
+
+  /// 페널티 상세 + 이의신청 진입 시트.
+  Future<void> _showPenaltySheet(List<PenaltyView> penalties) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            left: 20,
+            right: 20,
+            top: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('내 페널티',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            const Text('부당하다고 생각되면 이의신청 할 수 있어요. 담당자가 검토 후 처리합니다.',
+                style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
+            const SizedBox(height: 16),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: penalties.length,
+                separatorBuilder: (_, _) => const Divider(height: 20),
+                itemBuilder: (_, i) => _penaltyRow(ctx, penalties[i]),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _penaltyRow(BuildContext sheetCtx, PenaltyView p) {
+    final label = _penaltyKindLabels[p.kind] ?? p.reason ?? p.kind;
+    final dateStr = p.at == null
+        ? ''
+        : '${p.at!.year}.${p.at!.month.toString().padLeft(2, '0')}.${p.at!.day.toString().padLeft(2, '0')}';
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700)),
+              if (dateStr.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(dateStr,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.inkSub)),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        _penaltyTrailing(sheetCtx, p),
+      ],
+    );
+  }
+
+  Widget _penaltyTrailing(BuildContext sheetCtx, PenaltyView p) {
+    if (p.waived) return _statusChip('면제됨', AppColors.accent);
+    if (p.appealStatus == 'requested') {
+      return _statusChip('이의신청 접수됨', AppColors.warn);
+    }
+    if (p.appealStatus != 'none') {
+      return _statusChip('검토 완료', AppColors.inkSub);
+    }
+    if (!p.canAppeal) return const SizedBox.shrink();
+    return FilledButton.tonal(
+      onPressed: () => _appealPenalty(sheetCtx, p),
+      style: FilledButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 14)),
+      child: const Text('이의신청'),
+    );
+  }
+
+  Widget _statusChip(String text, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(text,
+            style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+      );
+
+  Future<void> _appealPenalty(BuildContext sheetCtx, PenaltyView p) async {
+    final reason = TextEditingController();
+    try {
+      final submitted = await showDialog<bool>(
+        context: sheetCtx,
+        builder: (dctx) => AlertDialog(
+          title: const Text('이의신청'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('어떤 점이 부당했는지 알려주세요. 담당자가 검토합니다.',
+                  style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reason,
+                autofocus: true,
+                maxLength: 500,
+                maxLines: 3,
+                decoration:
+                    const InputDecoration(hintText: '예) 당일 병원 진단서가 있어요'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dctx, false),
+                child: const Text('닫기')),
+            FilledButton(
+                onPressed: () => Navigator.pop(dctx, true),
+                child: const Text('제출')),
+          ],
+        ),
+      );
+      if (submitted != true) return;
+      final text = reason.text.trim();
+      if (text.isEmpty) {
+        _snack('사유를 입력해주세요');
+        return;
+      }
+      try {
+        await ref.read(workerRepositoryProvider).appealPenalty(p.id!, text);
+        ref.invalidate(myReliabilityProvider);
+        if (sheetCtx.mounted) Navigator.pop(sheetCtx); // 최신 상태로 다시 열도록 시트 닫기
+        _snack('이의신청이 접수됐어요. 검토 후 알려드릴게요.');
+      } catch (e, s) {
+        AppLog.e('penalty_appeal_failed',
+            context: {'penalty_id': p.id}, error: e, stack: s);
+        _snack('이의신청 실패: ${_appealError(e)}');
+      }
+    } finally {
+      reason.dispose();
+    }
+  }
+
+  String _appealError(Object e) {
+    final s = e.toString();
+    if (s.contains('already_appealed')) return '이미 이의신청한 페널티예요';
+    if (s.contains('already_waived')) return '이미 면제된 페널티예요';
+    if (s.contains('not_your_penalty')) return '본인 페널티만 이의신청할 수 있어요';
+    if (s.contains('empty_reason')) return '사유를 입력해주세요';
+    return '잠시 후 다시 시도해주세요';
   }
 
   Widget _waitingView() {
@@ -594,10 +830,14 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
 
   Widget _assignmentView(Assignment a) {
     final checkedIn = a.status == 'checked_in';
+    final myId = supabase.auth.currentUser?.id ?? '';
+    final contract = ref.watch(contractProvider(a.id)).asData?.value;
+    final needsSign = contract != null && !contract.workerSigned;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          SosBanner(assignmentId: a.id, myUserId: myId),
           Container(
             width: 72,
             height: 72,
@@ -616,6 +856,22 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
                   : 'e-근로계약서가 발급됐어요. 근무 시작 시 GPS 체크인하세요.',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14, color: AppColors.inkSub)),
+          if (checkedIn) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.my_location_rounded,
+                    size: 14, color: AppColors.accent),
+                const SizedBox(width: 6),
+                Text('근무 중 실시간 위치 공유 중',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent)),
+              ],
+            ),
+          ],
           const SizedBox(height: 24),
           SizedBox(
             width: 220,
@@ -625,12 +881,50 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
                   : null,
               onPressed: _busy
                   ? null
-                  : () => checkedIn ? _checkOut(a) : _checkIn(a),
+                  : () {
+                      // 근무 전 계약서 서명 게이트: 미서명이면 계약서로 유도.
+                      if (!checkedIn && needsSign) {
+                        _snack('먼저 근로계약서에 서명해주세요.');
+                        context.push('/contract/${a.id}');
+                        return;
+                      }
+                      checkedIn ? _checkOut(a) : _checkIn(a);
+                    },
               icon: Icon(checkedIn
                   ? Icons.logout_rounded
                   : Icons.login_rounded),
               label: Text(checkedIn ? 'GPS 체크아웃' : 'GPS 체크인'),
             ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: 260,
+            child: OutlinedButton.icon(
+              onPressed: () => context.push('/contract/${a.id}'),
+              icon: Icon(needsSign
+                  ? Icons.draw_rounded
+                  : Icons.description_outlined),
+              label: Text(needsSign ? '근로계약서 서명하기' : '근로계약서 보기'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: 260,
+            child: OutlinedButton.icon(
+              onPressed: () => context.push('/chat/${a.id}'),
+              icon: const Icon(Icons.chat_bubble_outline_rounded),
+              label: const Text('채팅으로 소통하기'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(width: 260, child: SosButton(assignmentId: a.id)),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => showDisputeSheet(context, a.id),
+            icon: const Icon(Icons.gavel_rounded,
+                size: 18, color: AppColors.inkSub),
+            label: const Text('문제 신고 / 분쟁',
+                style: TextStyle(color: AppColors.inkSub)),
           ),
           if (!checkedIn) ...[
             const SizedBox(height: 8),

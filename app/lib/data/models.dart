@@ -245,6 +245,224 @@ class MatchingSnapshot {
   bool get isConfirmed => status == 'confirmed' || status == 'in_progress';
 }
 
+/// 인앱 채팅 메시지 (messages). 확정 배정 당사자 간 소통 + 분쟁 증거.
+class Message {
+  final String id;
+  final String assignmentId;
+  final String senderId;
+  final String body;
+  final DateTime createdAt;
+  const Message({
+    required this.id,
+    required this.assignmentId,
+    required this.senderId,
+    required this.body,
+    required this.createdAt,
+  });
+
+  factory Message.fromMap(Map<String, dynamic> m) => Message(
+        id: m['id'] as String,
+        assignmentId: m['assignment_id'] as String,
+        senderId: m['sender_id'] as String,
+        body: (m['body'] as String?) ?? '',
+        createdAt: DateTime.parse(m['created_at'] as String).toLocal(),
+      );
+}
+
+/// 실시간 위치 공유 (live_locations). 근무 중 근로자 위치 + 근무지까지 거리.
+class LiveLocation {
+  final String assignmentId;
+  final String sharerId;
+  final int? distToSiteM;
+  final DateTime updatedAt;
+  const LiveLocation({
+    required this.assignmentId,
+    required this.sharerId,
+    required this.distToSiteM,
+    required this.updatedAt,
+  });
+
+  factory LiveLocation.fromMap(Map<String, dynamic> m) => LiveLocation(
+        assignmentId: m['assignment_id'] as String,
+        sharerId: m['sharer_id'] as String,
+        distToSiteM: (m['dist_to_site_m'] as num?)?.toInt(),
+        updatedAt: DateTime.parse(m['updated_at'] as String).toLocal(),
+      );
+
+  int get secondsAgo => DateTime.now().difference(updatedAt).inSeconds;
+  bool get isStale => secondsAgo > 45; // 45초 이상 미갱신이면 오래된 것
+}
+
+/// 원터치 SOS (sos_alerts). 근무 중 긴급 상황 기록·상대 알림.
+class SosAlert {
+  final String id;
+  final String? assignmentId;
+  final String reporterId;
+  final String status; // open/resolved
+  final String? note;
+  final DateTime createdAt;
+  const SosAlert({
+    required this.id,
+    required this.assignmentId,
+    required this.reporterId,
+    required this.status,
+    required this.note,
+    required this.createdAt,
+  });
+
+  factory SosAlert.fromMap(Map<String, dynamic> m) => SosAlert(
+        id: m['id'] as String,
+        assignmentId: m['assignment_id'] as String?,
+        reporterId: m['reporter_id'] as String,
+        status: (m['status'] as String?) ?? 'open',
+        note: m['note'] as String?,
+        createdAt: DateTime.parse(m['created_at'] as String).toLocal(),
+      );
+}
+
+DateTime? _tsOrNull(dynamic v) =>
+    v == null ? null : DateTime.parse(v as String).toLocal();
+
+/// 페널티 (penalties) — 노쇼/임박취소 등으로 부과. 근로자는 이의신청 가능.
+/// [id]는 구 백엔드(요약에 id 미노출)와의 호환을 위해 nullable — null이면 이의신청 불가.
+class PenaltyView {
+  final String? id;
+  final String kind; // no_show | late_cancel | ...
+  final String? reason; // 시스템이 기록한 부과 사유
+  final bool waived; // 면제됨
+  final String appealStatus; // none | requested | ... (운영자 처리 후 확장)
+  final DateTime? at;
+  const PenaltyView({
+    required this.id,
+    required this.kind,
+    required this.reason,
+    required this.waived,
+    required this.appealStatus,
+    required this.at,
+  });
+
+  factory PenaltyView.fromMap(Map<String, dynamic> m) => PenaltyView(
+        id: m['id'] as String?,
+        kind: (m['kind'] as String?) ?? 'penalty',
+        reason: m['reason'] as String?,
+        waived: m['waived'] == true,
+        appealStatus: (m['appeal_status'] as String?) ?? 'none',
+        at: _tsOrNull(m['at']),
+      );
+
+  /// 이의신청 가능 조건: id를 알고(신 백엔드) · 미면제 · 아직 미신청.
+  bool get canAppeal => id != null && !waived && appealStatus == 'none';
+}
+
+/// 분쟁 증거 1건 (disputes.evidence 배열의 요소).
+class DisputeEvidence {
+  final String? by; // 작성자 profile id
+  final String? category; // 최초 신고 항목에만 존재
+  final String text;
+  final DateTime? at;
+  const DisputeEvidence({
+    required this.by,
+    required this.category,
+    required this.text,
+    required this.at,
+  });
+
+  factory DisputeEvidence.fromMap(Map<String, dynamic> m) => DisputeEvidence(
+        by: m['by'] as String?,
+        category: m['category'] as String?,
+        text: (m['text'] as String?) ?? '',
+        at: _tsOrNull(m['at']),
+      );
+}
+
+/// 분쟁 (disputes) — 배정 당사자가 연 문제 제기 + 증거 타임라인.
+/// 해소(status/resolution)는 운영자가 처리. 앱은 신고·증거·조회까지.
+class DisputeView {
+  final String id;
+  final String assignmentId;
+  final String status; // open | resolved ...
+  final String? resolution;
+  final DateTime? slaDeadline;
+  final DateTime? createdAt;
+  final bool iOpened; // 내가 연 분쟁인지
+  final List<DisputeEvidence> evidence;
+  const DisputeView({
+    required this.id,
+    required this.assignmentId,
+    required this.status,
+    required this.resolution,
+    required this.slaDeadline,
+    required this.createdAt,
+    required this.iOpened,
+    required this.evidence,
+  });
+
+  factory DisputeView.fromMap(Map<String, dynamic> m) => DisputeView(
+        id: m['id'] as String,
+        assignmentId: m['assignment_id'] as String,
+        status: (m['status'] as String?) ?? 'open',
+        resolution: m['resolution'] as String?,
+        slaDeadline: _tsOrNull(m['sla_deadline']),
+        createdAt: _tsOrNull(m['created_at']),
+        iOpened: m['i_opened'] == true,
+        evidence: ((m['evidence'] as List?) ?? const [])
+            .map((e) => DisputeEvidence.fromMap((e as Map).cast<String, dynamic>()))
+            .toList(),
+      );
+
+  bool get isOpen => status == 'open';
+}
+
+/// 전자 근로계약서 (contracts) — 확정 조건 스냅샷(terms) + 양측 서명.
+class WorkContract {
+  final String id;
+  final String assignmentId;
+  final Map<String, dynamic> terms;
+  final String incomeType; // daily_wage 등
+  final DateTime? signedWorkerAt;
+  final DateTime? signedEmployerAt;
+  final String? workerId;
+  final String? employerId;
+
+  const WorkContract({
+    required this.id,
+    required this.assignmentId,
+    required this.terms,
+    required this.incomeType,
+    required this.signedWorkerAt,
+    required this.signedEmployerAt,
+    required this.workerId,
+    required this.employerId,
+  });
+
+  factory WorkContract.fromMap(Map<String, dynamic> m) => WorkContract(
+        id: m['id'] as String,
+        assignmentId: m['assignment_id'] as String,
+        terms: ((m['terms'] as Map?) ?? const {}).cast<String, dynamic>(),
+        incomeType: (m['income_type'] as String?) ?? 'daily_wage',
+        signedWorkerAt: _tsOrNull(m['signed_worker_at']),
+        signedEmployerAt: _tsOrNull(m['signed_employer_at']),
+        workerId: m['worker_id'] as String?,
+        employerId: m['employer_id'] as String?,
+      );
+
+  bool get workerSigned => signedWorkerAt != null;
+  bool get employerSigned => signedEmployerAt != null;
+  bool get fullySigned => workerSigned && employerSigned;
+
+  String get employerName => (terms['employer_name'] as String?) ?? '요청자';
+  String get workerName => (terms['worker_name'] as String?) ?? '근로자';
+  String get title => (terms['title'] as String?) ?? '';
+  int get payAmount => (terms['pay_amount'] as num?)?.toInt() ?? 0;
+  String get payType => (terms['pay_type'] as String?) ?? 'daily';
+  String? get address => terms['address'] as String?;
+  DateTime? get startAt => _tsOrNull(terms['start_at']);
+  DateTime? get endAt => _tsOrNull(terms['end_at']);
+  String? get brokerNote => terms['broker_note'] as String?;
+  String get incomeTypeLabel =>
+      incomeType == 'daily_wage' ? '일용근로소득' : incomeType;
+}
+
 /// 금액 콤마 포맷 (₩ 제외).
 String formatWon(int v) {
   final s = v.toString();

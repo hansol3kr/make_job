@@ -133,6 +133,13 @@ class WorkerRepository {
         'p_cert_name': certName,
         'p_cert_ref': certRef,
       });
+
+  /// 페널티 이의신청(본인·미면제·미신청 페널티만). 승인/기각은 운영자 처리.
+  Future<void> appealPenalty(String penaltyId, String reason) =>
+      supabase.rpc('appeal_penalty', params: {
+        'p_penalty_id': penaltyId,
+        'p_reason': reason,
+      });
 }
 
 final workerRepositoryProvider =
