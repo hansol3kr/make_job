@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/logger.dart';
 import '../../core/theme.dart';
 import '../../data/auth.dart';
 import '../../data/models.dart';
@@ -46,7 +47,9 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
       await ref
           .read(workerRepositoryProvider)
           .setAvailability(v, lng: loc.lng, lat: loc.lat);
-    } catch (e) {
+    } catch (e, s) {
+      AppLog.e('availability_toggle_failed',
+          context: {'to': v}, error: e, stack: s);
       if (mounted) {
         setState(() => _available = !v); // 실패 시 롤백
         _snack('상태 변경 실패: $e');
@@ -61,7 +64,9 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
     try {
       await ref.read(workerRepositoryProvider).acceptOffer(o.offerId);
       // 배정 스트림이 갱신되며 화면이 확정 뷰로 전환됨.
-    } catch (e) {
+    } catch (e, s) {
+      AppLog.e('offer_accept_failed',
+          context: {'offer_id': o.offerId}, error: e, stack: s);
       _snack(_friendly(e));
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -72,7 +77,9 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
     setState(() => _busy = true);
     try {
       await ref.read(workerRepositoryProvider).declineOffer(o.offerId);
-    } catch (e) {
+    } catch (e, s) {
+      AppLog.e('offer_decline_failed',
+          context: {'offer_id': o.offerId}, error: e, stack: s);
       _snack(_friendly(e));
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -86,7 +93,9 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
       await ref
           .read(workerRepositoryProvider)
           .checkIn(a.id, loc.lng, loc.lat);
-    } catch (e) {
+    } catch (e, s) {
+      AppLog.e('check_in_failed',
+          context: {'assignment_id': a.id}, error: e, stack: s);
       _snack('체크인 실패: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -99,7 +108,9 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
       await ref.read(workerRepositoryProvider).checkOut(a.id);
       ref.invalidate(myReliabilityProvider);
       if (mounted) await _showRatingSheet(a.id);
-    } catch (e) {
+    } catch (e, s) {
+      AppLog.e('check_out_failed',
+          context: {'assignment_id': a.id}, error: e, stack: s);
       _snack('체크아웃 실패: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -130,7 +141,9 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
       await ref.read(workerRepositoryProvider).cancelAssignment(a.id);
       ref.invalidate(myReliabilityProvider);
       _snack('배정을 취소했어요. 빈자리는 백필됩니다.');
-    } catch (e) {
+    } catch (e, s) {
+      AppLog.e('assignment_cancel_failed',
+          context: {'assignment_id': a.id}, error: e, stack: s);
       _snack('취소 실패: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -196,7 +209,11 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
                         );
                     if (ctx.mounted) Navigator.pop(ctx);
                     _snack('평가 고마워요! 👏');
-                  } catch (e) {
+                  } catch (e, s) {
+                    AppLog.e('rate_employer_failed',
+                        context: {'assignment_id': assignmentId},
+                        error: e,
+                        stack: s);
                     _snack('평가 실패: $e');
                   }
                 },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/logger.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/employer_repository.dart';
@@ -227,7 +228,9 @@ class MatchingStatusPage extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('노쇼 처리됨 · 백필 오퍼 $n건 전송')));
       }
-    } catch (e) {
+    } catch (e, s) {
+      AppLog.e('report_no_show_failed',
+          context: {'assignment_id': assignmentId}, error: e, stack: s);
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('신고 실패: $e')));
@@ -297,7 +300,11 @@ class MatchingStatusPage extends ConsumerWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('평가 완료 👏')));
                     }
-                  } catch (e) {
+                  } catch (e, s) {
+                    AppLog.e('rate_worker_failed',
+                        context: {'assignment_id': assignmentId},
+                        error: e,
+                        stack: s);
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx)
                           .showSnackBar(SnackBar(content: Text('평가 실패: $e')));

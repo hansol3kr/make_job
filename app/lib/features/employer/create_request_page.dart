@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/logger.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/employer_repository.dart';
@@ -58,7 +59,9 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
       ref.invalidate(myRequestsProvider);
       if (!mounted) return;
       context.go('/employer/matching/$requestId');
-    } catch (e) {
+    } catch (e, s) {
+      AppLog.e('create_request_failed',
+          context: {'requires_pro': _requiresPro}, error: e, stack: s);
       if (mounted) setState(() => _error = _friendly(e));
     } finally {
       if (mounted) setState(() => _busy = false);

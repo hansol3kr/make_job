@@ -101,8 +101,10 @@ class _PhoneLoginPageState extends ConsumerState<PhoneLoginPage> {
       if (!mounted) return;
       setState(() => _otpSent = true);
     } on AuthException catch (e) {
+      AppLog.w('otp_send_failed', error: e);
       if (mounted) setState(() => _error = e.message);
-    } catch (e) {
+    } catch (e, s) {
+      AppLog.e('otp_send_failed', error: e, stack: s);
       if (mounted) setState(() => _error = '발송 실패: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -118,8 +120,10 @@ class _PhoneLoginPageState extends ConsumerState<PhoneLoginPage> {
       await ref.read(authRepositoryProvider).verifyOtp(_phoneE164, _otp.text.trim());
       await _postLoginNav();
     } on AuthException catch (e) {
+      AppLog.w('otp_verify_failed', error: e);
       if (mounted) setState(() => _error = e.message);
-    } catch (e) {
+    } catch (e, s) {
+      AppLog.e('otp_verify_failed', error: e, stack: s);
       if (mounted) setState(() => _error = '인증 실패: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
