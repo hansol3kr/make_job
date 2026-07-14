@@ -18,6 +18,7 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
   int _catIndex = 0;
   int _headcount = 1;
   int _pay = 95000;
+  bool _requiresPro = false;
   late DateTime _start;
   late DateTime _end;
   bool _busy = false;
@@ -45,12 +46,13 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
     try {
       final repo = ref.read(employerRepositoryProvider);
       final requestId = await repo.createRequest(
-        title: '${cat.name} 대타',
+        title: '${_requiresPro ? '[전문] ' : ''}${cat.name} 대타',
         startAt: _start,
         endAt: _end,
         payAmount: _pay,
         headcount: _headcount,
         categoryId: cat.id,
+        requiresProfessional: _requiresPro,
       );
       await repo.requestMatching(requestId);
       ref.invalidate(myRequestsProvider);
@@ -137,6 +139,41 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
                     setState(() => _pay = (_pay - 5000).clamp(0, 2000000)),
                 onPlus: () =>
                     setState(() => _pay = (_pay + 5000).clamp(0, 2000000)),
+              ),
+              const SizedBox(height: 24),
+              _label('전문인력'),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: _requiresPro ? AppColors.primary : AppColors.line),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.workspace_premium_rounded,
+                        color: AppColors.primary),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('전문인력만 부르기',
+                              style: TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w700)),
+                          Text('인증된 전문인력에게만 매칭돼요',
+                              style: TextStyle(
+                                  fontSize: 12, color: AppColors.inkSub)),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _requiresPro,
+                      onChanged: (v) => setState(() => _requiresPro = v),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
               _label('위치'),

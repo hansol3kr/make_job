@@ -30,9 +30,11 @@ class AuthRepository {
 
   /// 소셜 로그인(카카오/구글). 외부 브라우저 → 딥링크(kr.jigeum.jigeum://login-callback)로
   /// 복귀하면 supabase_flutter가 세션을 자동 수립하고 onAuthStateChange(signedIn) 발생.
+  /// 카카오는 이메일 동의항목 미설정 시 에러 → 닉네임 스코프만 요청해 회피.
   Future<bool> signInWithOAuth(OAuthProvider provider) => supabase.auth.signInWithOAuth(
         provider,
         redirectTo: 'kr.jigeum.jigeum://login-callback',
+        scopes: provider == OAuthProvider.kakao ? 'profile_nickname' : null,
       );
 
   Future<void> signOut() => supabase.auth.signOut();

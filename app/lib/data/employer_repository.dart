@@ -35,6 +35,7 @@ class EmployerRepository {
     double? lat,
     String? address,
     String payType = 'daily',
+    bool requiresProfessional = false,
   }) async {
     final id = await supabase.rpc('create_job_request', params: {
       'p_title': title,
@@ -47,6 +48,7 @@ class EmployerRepository {
       'p_lat': lat,
       'p_address': address,
       'p_pay_type': payType,
+      'p_requires_professional': requiresProfessional,
     });
     return id as String;
   }

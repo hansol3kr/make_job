@@ -269,6 +269,10 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
               const SizedBox(height: 12),
               _reliabilityBar(rel),
             ],
+            if (rel != null && verified && rel['professional'] != true) ...[
+              const SizedBox(height: 12),
+              _proRegisterEntry(),
+            ],
             const SizedBox(height: 20),
             Expanded(
               child: assignment != null
@@ -357,9 +361,41 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
     );
   }
 
+  Widget _proRegisterEntry() {
+    return InkWell(
+      onTap: () => context.push('/register-professional'),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.workspace_premium_rounded, color: AppColors.primary),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('전문인력으로 등록하기',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+                Text('자격을 인증하면 전문가 요청·높은 단가를 받아요',
+                    style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+        ]),
+      ),
+    );
+  }
+
   Widget _reliabilityBar(Map<String, dynamic> rel) {
     final score = (rel['reliability'] as num?)?.toDouble() ?? 50.0;
     final tier = (rel['tier'] as String?) ?? 'standard';
+    final isPro = rel['professional'] == true;
     final penalties = (rel['penalties'] as List?) ?? const [];
     final tierLabel = {
       'top_pro': '탑프로',
@@ -392,6 +428,26 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
               style: TextStyle(
                   fontSize: 12, fontWeight: FontWeight.w700, color: tierColor)),
         ),
+        if (isPro) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.workspace_premium_rounded,
+                  size: 13, color: AppColors.primary),
+              SizedBox(width: 3),
+              Text('전문',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary)),
+            ]),
+          ),
+        ],
         const Spacer(),
         if (penalties.isNotEmpty)
           Row(children: [

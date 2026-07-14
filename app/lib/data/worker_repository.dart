@@ -126,6 +126,13 @@ class WorkerRepository {
         'p_sub_scores': subScores,
         'p_comment': comment,
       });
+
+  /// 전문인력 등록(본인확인 선행 필수). 자격/경력 제출 → 전문인력 인증.
+  Future<void> registerProfessional(String certName, {String? certRef}) =>
+      supabase.rpc('register_professional', params: {
+        'p_cert_name': certName,
+        'p_cert_ref': certRef,
+      });
 }
 
 final workerRepositoryProvider =
