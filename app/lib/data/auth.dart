@@ -124,6 +124,10 @@ class AuthRepository {
         provider,
         redirectTo: 'kr.jigeum.jigeum://login-callback',
         scopes: provider.name == 'kakao' ? 'profile_nickname' : null,
+        // iOS 기본값(platformDefault=인앱 SFSafariViewController)은 OAuth 초기 로드에
+        // 실패(_failedSafariViewControllerLoadException)한다. SDK는 Google-Android만
+        // 외부브라우저로 우회하고 iOS는 안 하므로, 여기서 외부 브라우저로 강제한다.
+        authScreenLaunchMode: LaunchMode.externalApplication,
       );
 
   Future<void> signOut() => supabase.auth.signOut();

@@ -79,6 +79,7 @@ workflows:
             --build-number=$BUILD_NUMBER \
             --dart-define=SUPABASE_URL=$SUPABASE_URL \
             --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY \
+            --dart-define=ENABLED_OAUTH=google,kakao \
             --dart-define=APP_VERSION=1.0.0 \
             --dart-define=APP_BUILD=$BUILD_NUMBER \
             --export-options-plist=/Users/builder/export_options.plist

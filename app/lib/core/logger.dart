@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
+import 'platform_info.dart';
 import 'supabase_client.dart';
 
 /// 원격 로그 채널. 앱에서 발생한 에러/이벤트를 클라우드 `client_logs`에 적재해
@@ -35,7 +35,7 @@ class AppLog {
     final now = DateTime.now();
     _sessionId = '${now.microsecondsSinceEpoch}-${now.hashCode & 0xffff}';
     try {
-      _device = '${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
+      _device = platformDevice();
     } catch (_) {}
 
     // 주기적 flush (periodic 타이머는 이벤트루프가 유지하므로 참조 보관 불필요)
@@ -83,7 +83,7 @@ class AppLog {
 
   String _safeOs() {
     try {
-      return Platform.operatingSystem;
+      return platformOs();
     } catch (_) {
       return 'unknown';
     }
