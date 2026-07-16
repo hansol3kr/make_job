@@ -112,6 +112,9 @@ class OfferView {
   final int? rank;
   final int? distanceM; // reason.distance_m
   final num? reliability; // reason.reliability
+  final int? proxPct; // reason.prox_pct (근접 기여 %)
+  final int? relPct; // reason.rel_pct (신뢰 기여 %)
+  final bool isRebook; // reason.rebook — 단골 사장님의 지명 요청
   final DateTime expiresAt;
   // 요청 상세
   final String title;
@@ -129,6 +132,9 @@ class OfferView {
     required this.rank,
     required this.distanceM,
     required this.reliability,
+    this.proxPct,
+    this.relPct,
+    this.isRebook = false,
     required this.expiresAt,
     required this.title,
     required this.categoryId,
@@ -149,6 +155,9 @@ class OfferView {
       rank: (offer['rank'] as num?)?.toInt(),
       distanceM: (reason['distance_m'] as num?)?.toInt(),
       reliability: reason['reliability'] as num?,
+      proxPct: (reason['prox_pct'] as num?)?.toInt(),
+      relPct: (reason['rel_pct'] as num?)?.toInt(),
+      isRebook: reason['rebook'] == true,
       expiresAt: DateTime.parse(offer['expires_at'] as String).toLocal(),
       title: (req['title'] as String?) ?? '',
       categoryId: req['category_id'] as String?,
@@ -158,6 +167,15 @@ class OfferView {
       endAt: DateTime.parse(req['end_at'] as String).toLocal(),
       address: req['address'] as String?,
     );
+  }
+
+  /// 왜 이 오퍼가 상위인지 한 줄 설명(설명가능 랭킹). 근거 없으면 null.
+  String? get matchReason {
+    if (isRebook) return '함께 일했던 사장님의 지명 요청이에요';
+    if (proxPct == null || relPct == null) return null;
+    return proxPct! >= relPct!
+        ? '가까운 거리로 우선 매칭 (근접 $proxPct%)'
+        : '높은 신뢰도로 우선 매칭 (신뢰 $relPct%)';
   }
 }
 
@@ -243,6 +261,29 @@ class MatchingSnapshot {
       );
 
   bool get isConfirmed => status == 'confirmed' || status == 'in_progress';
+  bool get isCompleted => status == 'completed';
+  bool get isExpired => status == 'expired';
+}
+
+/// 업장(매장) — 사장님이 여러 매장을 두고 매장별로 요청 (stores).
+class Store {
+  final String id;
+  final String name;
+  final String? address;
+  final bool isDefault;
+  const Store({
+    required this.id,
+    required this.name,
+    this.address,
+    required this.isDefault,
+  });
+
+  factory Store.fromMap(Map<String, dynamic> m) => Store(
+        id: m['id'] as String,
+        name: (m['name'] as String?) ?? '매장',
+        address: m['address'] as String?,
+        isDefault: (m['is_default'] as bool?) ?? false,
+      );
 }
 
 /// 인앱 채팅 메시지 (messages). 확정 배정 당사자 간 소통 + 분쟁 증거.

@@ -17,35 +17,383 @@ class MatchingStatusPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final snap = ref.watch(matchingProvider(requestId));
-    final confirmed = snap.asData?.value.isConfirmed ?? false;
+    final s0 = snap.asData?.value;
+    final confirmed = s0?.isConfirmed ?? false;
+    final completed = s0?.isCompleted ?? false;
+    final expired = s0?.isExpired ?? false;
+    final status = s0?.status;
+    final filled = s0?.filledCount ?? 0;
+    final canCancel = status != null &&
+        !{'cancelled', 'completed', 'expired'}.contains(status);
+    // 확정 근로자가 하나라도 있으면 수정 불가(취소-보상 흐름으로). 서버도 동일 가드.
+    final canEdit = (status == 'open' || status == 'matching') && filled == 0;
+
+    // 매칭 진행 중일 때만 연속성 폴링(만료→재웨이브→반경확장→소진).
+    Map<String, dynamic>? cont;
+    final polling = !confirmed && !completed && !expired && status != 'cancelled';
+    if (polling) {
+      cont = ref.watch(matchingContinuityProvider(requestId)).asData?.value;
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(confirmed ? '확정 완료' : '실시간 매칭 중'),
+        title: Text(completed
+            ? '근무 완료'
+            : expired
+                ? '매칭 실패'
+                : confirmed
+                    ? '확정 완료'
+                    : '실시간 매칭 중'),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => context.go('/employer'),
         ),
+        actions: [
+          if (canCancel)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert_rounded),
+              onSelected: (v) {
+                if (v == 'cancel') _cancelRequest(context, ref, confirmed);
+                if (v == 'edit') _editRequest(context, ref);
+              },
+              itemBuilder: (_) => [
+                if (canEdit)
+                  const PopupMenuItem(value: 'edit', child: Text('요청 수정')),
+                const PopupMenuItem(value: 'cancel', child: Text('요청 취소')),
+              ],
+            ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: snap.when(
-          loading: () => _matchingView(null),
+          loading: () => _matchingView(null, null),
           error: (e, _) => Center(
             child: Text('매칭 현황을 불러오지 못했어요\n$e',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.danger)),
           ),
-          data: (s) => s.isConfirmed && s.workers.isNotEmpty
-              ? _confirmedView(context, ref, s)
-              : _matchingView(s),
+          data: (s) => s.isExpired
+              ? _expiredView(context, ref)
+              : (s.isConfirmed || s.isCompleted) && s.workers.isNotEmpty
+                  ? _confirmedView(context, ref, s)
+                  : _matchingView(s, cont),
         ),
       ),
     );
   }
 
-  Widget _matchingView(MatchingSnapshot? s) {
+  /// 매칭 실패(후보 소진) — 정직하게 알리고 다시 찾기/취소 제공. 수수료 0 약속.
+  Widget _expiredView(BuildContext context, WidgetRef ref) {
+    return Column(
+      children: [
+        const SizedBox(height: 48),
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: AppColors.inkSub.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.search_off_rounded,
+              size: 40, color: AppColors.inkSub),
+        ),
+        const SizedBox(height: 24),
+        const Text('지금은 가능한 분을 못 찾았어요',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 10),
+        const Text('반경 10km까지 넓혀 찾았지만 응답이 없었어요.\n약속대로 수수료는 0원입니다.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: AppColors.inkSub, height: 1.5)),
+        const Spacer(),
+        FilledButton.icon(
+          onPressed: () async {
+            try {
+              await ref
+                  .read(employerRepositoryProvider)
+                  .continueMatching(requestId); // expired + 소유자 → 이력 리셋 후 재탐색
+              ref.invalidate(matchingProvider(requestId));
+              ref.invalidate(myRequestsProvider);
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text('다시 찾기 실패: $e')));
+              }
+            }
+          },
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('다시 찾기'),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton(
+          onPressed: () => context.go('/employer'),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          child: const Text('홈으로'),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Future<void> _editRequest(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(employerRepositoryProvider);
+    JobRequest req;
+    try {
+      req = await repo.getRequest(requestId);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('요청 조회 실패: $e')));
+      }
+      return;
+    }
+    if (!context.mounted) return;
+    var pay = req.payAmount;
+    var head = req.headcount;
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              20, 18, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('요청 수정',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 16),
+              const Text('급여 (일급, 총액)',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              _editStepper('₩${formatWon(pay)}',
+                  () => setSheet(() => pay = (pay - 5000).clamp(0, 2000000)),
+                  () => setSheet(() => pay = (pay + 5000).clamp(0, 2000000))),
+              const SizedBox(height: 16),
+              const Text('인원', style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              _editStepper('$head명',
+                  () => setSheet(() => head = (head - 1).clamp(1, 20)),
+                  () => setSheet(() => head = (head + 1).clamp(1, 20))),
+              const SizedBox(height: 12),
+              const Text('수정하면 대기 중인 제안을 취소하고 새 조건으로 다시 매칭돼요.',
+                  style: TextStyle(fontSize: 12, color: AppColors.inkSub)),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('수정하고 다시 매칭'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (saved != true) return;
+    try {
+      await repo.editRequest(requestId, payAmount: pay, headcount: head);
+      final offers = await repo.requestMatching(requestId);
+      AppLog.i('request_edited',
+          context: {'request_id': requestId, 'pay': pay, 'head': head, 'offers': offers});
+      ref.invalidate(myRequestsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(offers > 0
+                ? '수정하고 새 조건으로 다시 매칭했어요.'
+                : '수정했어요. 다만 지금은 조건에 맞는 근로자가 없어요.')));
+      }
+    } catch (e, s) {
+      AppLog.e('request_edit_failed',
+          context: {'request_id': requestId}, error: e, stack: s);
+      final es = e.toString();
+      final msg = es.contains('below_minimum_wage')
+          ? '급여가 최저임금에 못 미쳐요. 근무시간 대비 급여를 올려주세요.'
+          : es.contains('has_confirmed_workers')
+              ? '이미 확정된 근로자가 있어 수정할 수 없어요. 취소 후 다시 요청해주세요.'
+              : '수정 실패: $e';
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      }
+    }
+  }
+
+  Widget _editStepper(String text, VoidCallback onMinus, VoidCallback onPlus) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+                onPressed: onMinus,
+                icon: const Icon(Icons.remove_circle_outline_rounded)),
+            Text(text,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            IconButton(
+                onPressed: onPlus,
+                icon: const Icon(Icons.add_circle_outline_rounded)),
+          ],
+        ),
+      );
+
+  /// 재예약 시트 — 날짜(내일/모레/3일 후) 선택, 시간대·급여는 원 요청 그대로.
+  Future<void> _rebookSheet(
+      BuildContext context, WidgetRef ref, ConfirmedWorker w) async {
+    final repo = ref.read(employerRepositoryProvider);
+    JobRequest req;
+    try {
+      req = await repo.getRequest(requestId);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('요청 조회 실패: $e')));
+      }
+      return;
+    }
+    if (!context.mounted) return;
+    var dayOffset = 1; // 기본: 내일
+    final picked = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${w.displayName ?? '근로자'}님 다시 부르기',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text(
+                  '같은 시간대(${timeRangeLabel(req.startAt, req.endAt)})·같은 급여(₩${formatWon(req.payAmount)})로 지명 요청을 보내요.',
+                  style:
+                      const TextStyle(fontSize: 13, color: AppColors.inkSub)),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                children: [
+                  for (final (label, off) in [('내일', 1), ('모레', 2), ('3일 후', 3)])
+                    ChoiceChip(
+                      label: Text(label),
+                      selected: dayOffset == off,
+                      onSelected: (_) => setSheet(() => dayOffset = off),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  icon: const Icon(Icons.send_rounded),
+                  label: const Text('지명 요청 보내기 (10분간 유효)'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked != true) return;
+    try {
+      // 원 요청의 시각(시간대)을 선택한 날짜에 적용
+      final now = DateTime.now();
+      final base = DateTime(now.year, now.month, now.day)
+          .add(Duration(days: dayOffset));
+      final start = base.add(Duration(
+          hours: req.startAt.hour, minutes: req.startAt.minute));
+      final end = start.add(req.endAt.difference(req.startAt));
+      final newId = await repo.rebookWorker(w.assignmentId,
+          startAt: start, endAt: end);
+      AppLog.i('rebook_sent',
+          context: {'assignment_id': w.assignmentId, 'new_request': newId});
+      ref.invalidate(myRequestsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('지명 요청을 보냈어요. 10분 안에 응답이 없으면 자동으로 다른 분을 찾아요.')));
+        context.go('/employer/matching/$newId');
+      }
+    } catch (e, s) {
+      AppLog.e('rebook_failed',
+          context: {'assignment_id': w.assignmentId}, error: e, stack: s);
+      final es = e.toString();
+      final msg = es.contains('worker_schedule_conflict')
+          ? '이 분은 그 시간에 이미 다른 근무가 잡혀 있어요. 다른 날짜를 골라주세요.'
+          : es.contains('rebook_pending')
+              ? '이미 이 분께 보낸 지명 요청이 진행 중이에요.'
+              : es.contains('bad_time_range')
+                  ? '시작 시간이 이미 지났어요. 날짜를 다시 선택해주세요.'
+                  : '재예약 실패: $e';
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      }
+    }
+  }
+
+  Future<void> _cancelRequest(
+      BuildContext context, WidgetRef ref, bool confirmed) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('요청 취소'),
+        content: Text(confirmed
+            ? '확정된 근로자가 있어요.\n취소하면 근로자 보상 수수료가 부과돼요(근무 시점에 따라 급여의 0~50%).\n계속할까요?'
+            : '요청을 취소할까요?\n대기 중인 제안이 모두 취소됩니다.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('닫기')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('요청 취소'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final res =
+          await ref.read(employerRepositoryProvider).cancelRequest(requestId);
+      final fee = (res['fee_total'] as num?)?.toInt() ?? 0;
+      AppLog.i('request_cancelled',
+          context: {'request_id': requestId, 'fee': fee});
+      ref.invalidate(myRequestsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(fee > 0
+                ? '요청을 취소했어요. 근로자 보상 수수료 ${formatWon(fee)}원이 부과됐어요.'
+                : '요청을 취소했어요.')));
+        context.go('/employer');
+      }
+    } catch (e, s) {
+      AppLog.e('request_cancel_failed',
+          context: {'request_id': requestId}, error: e, stack: s);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('취소 실패: $e')));
+      }
+    }
+  }
+
+  Widget _matchingView(MatchingSnapshot? s, Map<String, dynamic>? cont) {
     final offered = s?.offeredCount ?? 0;
+    final radiusM = (cont?['radius_m'] as num?)?.toInt();
+    final radiusLabel = radiusM != null && radiusM > 3000
+        ? '반경 ${(radiusM / 1000).toStringAsFixed(0)}km로 넓혀서 찾는 중'
+        : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -62,11 +410,17 @@ class MatchingStatusPage extends ConsumerWidget {
                 fontSize: 22, height: 1.35, fontWeight: FontWeight.w900)),
         const SizedBox(height: 12),
         Text(
-          offered == 0
-              ? '반경 3km · 인증 완료 · 신뢰도순 정렬'
-              : '$offered명에게 오퍼 전송됨 · 응답 대기(60초)',
+          radiusLabel ??
+              (offered == 0
+                  ? '반경 3km · 인증 완료 · 신뢰도순 정렬'
+                  : '$offered명에게 오퍼 전송됨 · 응답 대기(60초)'),
           style: const TextStyle(fontSize: 15, color: AppColors.inkSub),
         ),
+        if (radiusLabel != null) ...[
+          const SizedBox(height: 6),
+          const Text('무응답 시 자동으로 다음 분들에게 넘어가요',
+              style: TextStyle(fontSize: 12, color: AppColors.inkSub)),
+        ],
         const Spacer(),
         Container(
           padding: const EdgeInsets.all(16),
@@ -186,6 +540,15 @@ class MatchingStatusPage extends ConsumerWidget {
           ),
         ),
         const Spacer(),
+        if (s.isCompleted) ...[
+          FilledButton.icon(
+            onPressed: () => _rebookSheet(context, ref, w),
+            icon: const Icon(Icons.replay_rounded),
+            label: Text('${w.displayName ?? '이 분'} 다시 부르기'),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          ),
+          const SizedBox(height: 10),
+        ],
         OutlinedButton.icon(
           onPressed: () => context.push('/contract/${w.assignmentId}'),
           icon: const Icon(Icons.description_outlined),

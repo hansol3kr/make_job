@@ -36,6 +36,7 @@ class EmployerRepository {
     String? address,
     String payType = 'daily',
     bool requiresProfessional = false,
+    String? storeId,
   }) async {
     final id = await supabase.rpc('create_job_request', params: {
       'p_title': title,
@@ -48,7 +49,8 @@ class EmployerRepository {
       'p_lat': lat,
       'p_address': address,
       'p_pay_type': payType,
-      'p_requires_professional': requiresProfessional,
+      'p_require_professional': requiresProfessional, // RPC 파라미터명과 일치(과거 오타 수정)
+      'p_store_id': storeId,
     });
     return id as String;
   }
@@ -59,6 +61,72 @@ class EmployerRepository {
         await supabase.rpc('request_matching', params: {'p_request_id': requestId});
     return (n as num).toInt();
   }
+
+  /// 요청 취소. matching 중이면 무료, 확정 근로자 있으면 보상 수수료.
+  /// 반환: {cancelled, confirmed_cancelled, fee_pct, fee_total}
+  Future<Map<String, dynamic>> cancelRequest(String requestId) async {
+    final res = await supabase
+        .rpc('cancel_job_request', params: {'p_request_id': requestId});
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  /// 매칭 전진: 만료 오퍼 정리 → 다음 웨이브(반경 확장) → 소진 시 expired.
+  /// expired 요청에 소유자가 호출하면 '다시 찾기'(이력 리셋 후 재탐색).
+  /// 반환: {state: waiting|rewaved|searching|exhausted|noop, radius_m?, live_offers?...}
+  Future<Map<String, dynamic>> continueMatching(String requestId) async {
+    final res = await supabase
+        .rpc('continue_matching', params: {'p_request_id': requestId});
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  /// 재예약 — 완료된 배정의 근로자에게 지명 오퍼(TTL 10분). 새 요청 id 반환.
+  Future<String> rebookWorker(
+    String assignmentId, {
+    required DateTime startAt,
+    required DateTime endAt,
+    int? payAmount,
+  }) async {
+    final res = await supabase.rpc('rebook_worker', params: {
+      'p_assignment_id': assignmentId,
+      'p_start_at': startAt.toUtc().toIso8601String(),
+      'p_end_at': endAt.toUtc().toIso8601String(),
+      'p_pay_amount': payAmount,
+    });
+    return res as String;
+  }
+
+  /// 요청 1건 조회(수정 화면 프리필용).
+  Future<JobRequest> getRequest(String requestId) async {
+    final rows = await supabase
+        .from('job_requests')
+        .select(
+            'id, title, category_id, pay_amount, pay_type, headcount, filled_count, status, start_at, end_at, address')
+        .eq('id', requestId)
+        .limit(1);
+    return JobRequest.fromMap((rows as List).first as Map<String, dynamic>);
+  }
+
+  /// 요청 수정(open/matching만). 수정 후 옛 오퍼 취소·open 복귀 → requestMatching으로 재매칭.
+  Future<void> editRequest(
+    String requestId, {
+    String? title,
+    DateTime? startAt,
+    DateTime? endAt,
+    int? payAmount,
+    int? headcount,
+    String? payType,
+    bool? requiresProfessional,
+  }) =>
+      supabase.rpc('edit_job_request', params: {
+        'p_request_id': requestId,
+        'p_title': title,
+        'p_start_at': startAt?.toUtc().toIso8601String(),
+        'p_end_at': endAt?.toUtc().toIso8601String(),
+        'p_pay_amount': payAmount,
+        'p_headcount': headcount,
+        'p_pay_type': payType,
+        'p_require_professional': requiresProfessional,
+      });
 
   /// 매칭 현황 스냅샷 1회 조회.
   Future<MatchingSnapshot> matchingSnapshot(String requestId) async {
@@ -105,4 +173,20 @@ final myRequestsProvider = FutureProvider.autoDispose<List<JobRequest>>((ref) {
 final matchingProvider = StreamProvider.autoDispose
     .family<MatchingSnapshot, String>((ref, requestId) {
   return ref.watch(employerRepositoryProvider).watchMatching(requestId);
+});
+
+/// 매칭 연속성 폴링 — 매칭 화면이 떠 있는 동안 15초마다 continue_matching.
+/// (만료 오퍼 정리 → 다음 웨이브 + 반경 확장 → 소진 시 expired. autoDispose로
+/// 화면 이탈 시 자동 중단. 백그라운드는 서버 pg_cron sweep이 보조.)
+final matchingContinuityProvider = StreamProvider.autoDispose
+    .family<Map<String, dynamic>, String>((ref, requestId) async* {
+  final repo = ref.watch(employerRepositoryProvider);
+  while (true) {
+    try {
+      yield await repo.continueMatching(requestId);
+    } catch (_) {
+      // 일시 실패는 다음 틱에 재시도.
+    }
+    await Future.delayed(const Duration(seconds: 15));
+  }
 });

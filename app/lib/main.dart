@@ -30,6 +30,20 @@ class JigeumApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       routerConfig: appRouter,
+      builder: (context, child) {
+        // 40~50대가 시스템 글꼴을 키운 경우 반영하되(접근성), 과도한 확대로
+        // 레이아웃이 깨지지 않게 1.0~1.3배로 제한.
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler: mq.textScaler.clamp(
+              minScaleFactor: 1.0,
+              maxScaleFactor: 1.3,
+            ),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

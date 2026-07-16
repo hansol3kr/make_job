@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -220,6 +221,8 @@ class _PhoneLoginPageState extends ConsumerState<PhoneLoginPage> {
               TextField(
                 controller: _phone,
                 keyboardType: TextInputType.phone,
+                autofillHints: const [AutofillHints.telephoneNumber],
+                style: const TextStyle(fontSize: 18),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-]'))
                 ],
@@ -242,6 +245,8 @@ class _PhoneLoginPageState extends ConsumerState<PhoneLoginPage> {
                 keyboardType: TextInputType.number,
                 autofocus: true,
                 maxLength: 6,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                style: const TextStyle(fontSize: 22, letterSpacing: 6),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(
                   labelText: '인증번호 6자리',
@@ -276,61 +281,74 @@ class _PhoneLoginPageState extends ConsumerState<PhoneLoginPage> {
                 child: Row(
                   children: [
                     const Icon(Icons.error_outline_rounded,
-                        color: AppColors.danger, size: 20),
+                        color: AppColors.danger, size: 24),
                     const SizedBox(width: 8),
                     Expanded(
                         child: Text(_error!,
                             style: const TextStyle(
-                                color: AppColors.danger, fontSize: 13))),
+                                color: AppColors.danger,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600))),
                   ],
                 ),
               ),
             ],
-            const SizedBox(height: 24),
-            Row(children: [
-              const Expanded(child: Divider()),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text('간편 로그인',
-                    style: TextStyle(fontSize: 12, color: AppColors.inkSub)),
-              ),
-              const Expanded(child: Divider()),
-            ]),
-            const SizedBox(height: 16),
-            for (final opt in _oauthOptions) ...[
-              _SocialButton(
-                label: '${opt.label}로 시작하기',
-                bg: opt.bg,
-                fg: opt.fg,
-                icon: opt.icon,
-                border: opt.border,
-                pending: !Env.enabledOAuth.contains(opt.provider.name),
-                onTap: _busy ? null : () => _oauth(opt),
-              ),
-              const SizedBox(height: 10),
+            // 서버 설정이 끝난(=실제 로그인 되는) 간편 로그인만 노출.
+            // 죽은 '준비 중' 버튼은 40~50대에게 "안 되는 앱" 인상을 줘 렌더에서 제외.
+            if (_activeOauth.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Row(children: [
+                const Expanded(child: Divider()),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('간편 로그인',
+                      style: TextStyle(fontSize: 14, color: AppColors.inkSub)),
+                ),
+                const Expanded(child: Divider()),
+              ]),
+              const SizedBox(height: 16),
+              for (final opt in _activeOauth) ...[
+                _SocialButton(
+                  label: '${opt.label}로 시작하기',
+                  bg: opt.bg,
+                  fg: opt.fg,
+                  icon: opt.icon,
+                  border: opt.border,
+                  onTap: _busy ? null : () => _oauth(opt),
+                ),
+                const SizedBox(height: 10),
+              ],
             ],
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.bg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.line),
+            // 개발용 데모 계정 안내는 debug 빌드에서만(릴리스 노출 금지).
+            if (kDebugMode) ...[
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.bg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.line),
+                ),
+                child: const Text(
+                  '🧪 로컬 데모 계정(개발용)\n'
+                  '· 근로자: 010-1234-1111\n'
+                  '· 사장님: 010-1234-2222\n'
+                  '· 인증번호: 123456',
+                  style: TextStyle(
+                      fontSize: 13, height: 1.6, color: AppColors.inkSub),
+                ),
               ),
-              child: const Text(
-                '🧪 로컬 데모 계정\n'
-                '· 근로자: 010-1234-1111\n'
-                '· 사장님: 010-1234-2222\n'
-                '· 인증번호: 123456',
-                style: TextStyle(
-                    fontSize: 12, height: 1.6, color: AppColors.inkSub),
-              ),
-            ),
+            ],
           ],
         ),
       ),
     );
   }
+
+  /// 서버 설정 완료로 실제 로그인 가능한 provider만.
+  List<_OAuthOption> get _activeOauth => _oauthOptions
+      .where((o) => Env.enabledOAuth.contains(o.provider.name))
+      .toList();
 }
 
 class _Spinner extends StatelessWidget {
@@ -349,7 +367,6 @@ class _SocialButton extends StatelessWidget {
   final Color fg;
   final IconData icon;
   final bool border;
-  final bool pending;
   final VoidCallback? onTap;
   const _SocialButton({
     required this.label,
@@ -358,50 +375,33 @@ class _SocialButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.border = false,
-    this.pending = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: pending ? 0.55 : 1,
-      child: SizedBox(
-        height: 52,
-        child: FilledButton(
-          onPressed: onTap,
-          style: FilledButton.styleFrom(
-            backgroundColor: bg,
-            foregroundColor: fg,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: border
-                  ? const BorderSide(color: AppColors.line)
-                  : BorderSide.none,
-            ),
+    return SizedBox(
+      height: 54,
+      child: FilledButton(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(
+          backgroundColor: bg,
+          foregroundColor: fg,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: border
+                ? const BorderSide(color: AppColors.line)
+                : BorderSide.none,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 22, color: fg),
-              const SizedBox(width: 8),
-              Text(label,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              if (pending) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: fg.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text('준비 중',
-                      style: TextStyle(
-                          fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
-                ),
-              ],
-            ],
-          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 22, color: fg),
+            const SizedBox(width: 8),
+            Text(label,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ],
         ),
       ),
     );

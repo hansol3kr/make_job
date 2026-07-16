@@ -63,5 +63,31 @@ ThemeData buildAppTheme() {
         side: const BorderSide(color: AppColors.line),
       ),
     ),
+    // 40~50대 가독성: 크기 미지정 텍스트의 기본 하한을 올린다(하드코딩 지정분은 화면별 처리).
+    textTheme: const TextTheme(
+      bodyLarge: TextStyle(fontSize: 16, height: 1.4, color: AppColors.ink),
+      bodyMedium: TextStyle(fontSize: 15, height: 1.4, color: AppColors.ink),
+      bodySmall: TextStyle(fontSize: 13, height: 1.4, color: AppColors.inkSub),
+    ),
+    // 입력 필드: 키 크고(세로 18) 테두리 뚜렷하게, 힌트·라벨 16px — 노안·오조작 대비.
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      hintStyle: const TextStyle(fontSize: 16, color: AppColors.inkSub),
+      labelStyle: const TextStyle(fontSize: 16, color: AppColors.inkSub),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.line),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.line),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.6),
+      ),
+    ),
   );
 }

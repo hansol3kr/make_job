@@ -20,6 +20,11 @@ class EmployerHomePage extends ConsumerWidget {
         title: const Text('사장님 홈'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.store_rounded),
+            tooltip: '매장 관리',
+            onPressed: () => context.push('/employer/stores'),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout_rounded),
             tooltip: '로그아웃',
             onPressed: () async {

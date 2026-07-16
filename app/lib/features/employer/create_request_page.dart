@@ -6,6 +6,7 @@ import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/employer_repository.dart';
 import '../../data/profile_repository.dart';
+import '../../data/store_repository.dart';
 
 /// 원터치 요청 생성 — 카테고리·시간·인원·급여. 위치는 매장 기본 위치.
 class CreateRequestPage extends ConsumerStatefulWidget {
@@ -24,6 +25,7 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
   late DateTime _end;
   bool _busy = false;
   String? _error;
+  String? _storeId; // 선택한 매장(없으면 기본 매장)
 
   @override
   void initState() {
@@ -35,6 +37,73 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
     }
     _start = start;
     _end = start.add(const Duration(hours: 6));
+  }
+
+  /// 시작/종료 시간 선택(TimePicker). 종료가 시작보다 빠르면 다음날로 간주하지 않고
+  /// 최소 1시간 근무로 자동 보정해 40~50대가 헷갈리지 않게 한다.
+  Future<void> _pickTime(bool isStart) async {
+    final base = isStart ? _start : _end;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: base.hour, minute: base.minute),
+      helpText: isStart ? '근무 시작 시간' : '근무 종료 시간',
+      builder: (ctx, child) => MediaQuery(
+        // 24시간 표기 강제(오전/오후 혼동 방지)
+        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+    setState(() {
+      final d = isStart ? _start : _end;
+      final next = DateTime(d.year, d.month, d.day, picked.hour, picked.minute);
+      if (isStart) {
+        _start = next;
+        if (!_end.isAfter(_start)) {
+          _end = _start.add(const Duration(hours: 1)); // 종료가 시작 이하면 +1시간
+        }
+      } else {
+        _end = next;
+        if (!_end.isAfter(_start)) {
+          _end = _start.add(const Duration(hours: 1));
+        }
+      }
+    });
+  }
+
+  Widget _timeButton(String label, DateTime t, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: const TextStyle(fontSize: 13, color: AppColors.inkSub)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Text(
+                  '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w900),
+                ),
+                const Spacer(),
+                const Icon(Icons.edit_calendar_rounded,
+                    size: 20, color: AppColors.primary),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _startMatching(List<AppCategory> cats) async {
@@ -54,6 +123,7 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
         headcount: _headcount,
         categoryId: cat.id,
         requiresProfessional: _requiresPro,
+        storeId: _storeId,
       );
       await repo.requestMatching(requestId);
       ref.invalidate(myRequestsProvider);
@@ -82,6 +152,11 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
   @override
   Widget build(BuildContext context) {
     final catsAsync = ref.watch(storeCategoriesProvider);
+    final stores = ref.watch(myStoresProvider).asData?.value ?? const <Store>[];
+    // 기본 선택: 기본 매장(없으면 첫 매장). 사용자가 고르면 그 값 유지.
+    if (_storeId == null && stores.isNotEmpty) {
+      _storeId = stores.firstWhere((s) => s.isDefault, orElse: () => stores.first).id;
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('지금 사람 찾기'),
@@ -126,8 +201,26 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
               ),
               const SizedBox(height: 24),
               _label('언제 필요하세요?'),
-              _tile(Icons.schedule_rounded, timeRangeLabel(_start, _end),
-                  '${_end.difference(_start).inHours}시간'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _timeButton('시작', _start, () => _pickTime(true)),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text('~',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w800)),
+                  ),
+                  Expanded(
+                    child: _timeButton('종료', _end, () => _pickTime(false)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('총 ${_end.difference(_start).inMinutes ~/ 60}시간 근무',
+                  style: const TextStyle(
+                      fontSize: 14, color: AppColors.inkSub)),
               const SizedBox(height: 24),
               _label('몇 분 필요하세요?'),
               _StepperRow(
@@ -182,8 +275,52 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              _label('위치'),
-              _tile(Icons.location_on_rounded, '등록된 매장 위치 기준', '반경 3km 매칭'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _label('매장 (위치 기준)'),
+                  TextButton.icon(
+                    onPressed: () => context.push('/employer/stores'),
+                    icon: const Icon(Icons.add_business_rounded, size: 18),
+                    label: const Text('매장 관리'),
+                  ),
+                ],
+              ),
+              if (stores.isEmpty)
+                _tile(Icons.location_on_rounded, '기본 매장 위치 기준', '반경 3km 매칭')
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: _storeId,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                      items: [
+                        for (final s in stores)
+                          DropdownMenuItem(
+                            value: s.id,
+                            child: Text(
+                                '${s.name}${s.isDefault ? '  · 기본' : ''}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700)),
+                          ),
+                      ],
+                      onChanged: (v) => setState(() => _storeId = v),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 6),
+              const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Text('선택한 매장 반경 3km에서 매칭돼요.',
+                    style: TextStyle(fontSize: 12, color: AppColors.inkSub)),
+              ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(14),
@@ -211,8 +348,10 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
               if (_error != null) ...[
                 const SizedBox(height: 16),
                 Text(_error!,
-                    style:
-                        const TextStyle(color: AppColors.danger, fontSize: 13)),
+                    style: const TextStyle(
+                        color: AppColors.danger,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600)),
               ],
             ],
           );

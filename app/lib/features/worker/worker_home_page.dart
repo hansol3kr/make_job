@@ -789,6 +789,10 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
                   const SizedBox(height: 8),
                   _reasonRow(Icons.verified_rounded, '보호',
                       '에스크로 선결제 · 당일 정산'),
+                  if (o.matchReason != null) ...[
+                    const SizedBox(height: 8),
+                    _reasonRow(Icons.insights_rounded, '매칭', o.matchReason!),
+                  ],
                 ],
               ),
             ),

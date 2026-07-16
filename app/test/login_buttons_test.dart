@@ -31,20 +31,23 @@ void main() {
     );
   });
 
-  testWidgets('로그인 화면: 5개 간편 로그인 버튼 + 인증번호 받기가 보인다', (tester) async {
+  testWidgets('로그인 화면: 활성 간편 로그인만 노출 + 인증번호 받기가 보인다', (tester) async {
     await tester.pumpWidget(const ProviderScope(
       child: MaterialApp(home: PhoneLoginPage(role: 'worker')),
     ));
     await tester.pump();
 
-    expect(find.text('카카오로 시작하기'), findsOneWidget);
-    expect(find.text('네이버로 시작하기'), findsOneWidget);
-    expect(find.text('토스로 시작하기'), findsOneWidget);
-    expect(find.text('Apple로 시작하기'), findsOneWidget);
-    expect(find.text('Google로 시작하기'), findsOneWidget);
+    // 폰 로그인은 항상 1순위.
     expect(find.text('인증번호 받기'), findsOneWidget);
 
-    // 기본 enabled=google → 나머지 4개는 '준비 중' 뱃지.
-    expect(find.text('준비 중'), findsNWidgets(4));
+    // 기본 ENABLED_OAUTH=google → 구글만 노출, 서버 미설정 provider는 숨김(죽은 버튼 금지).
+    expect(find.text('Google로 시작하기'), findsOneWidget);
+    expect(find.text('카카오로 시작하기'), findsNothing);
+    expect(find.text('네이버로 시작하기'), findsNothing);
+    expect(find.text('토스로 시작하기'), findsNothing);
+    expect(find.text('Apple로 시작하기'), findsNothing);
+
+    // '준비 중' 죽은 버튼/뱃지는 더 이상 없다.
+    expect(find.text('준비 중'), findsNothing);
   });
 }

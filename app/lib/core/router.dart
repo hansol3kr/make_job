@@ -9,6 +9,7 @@ import '../features/auth/onboarding_page.dart';
 import '../features/employer/employer_home_page.dart';
 import '../features/employer/create_request_page.dart';
 import '../features/employer/matching_status_page.dart';
+import '../features/employer/store_management_page.dart';
 import '../features/worker/worker_home_page.dart';
 import '../features/worker/identity_verification_page.dart';
 import '../features/worker/professional_registration_page.dart';
@@ -62,6 +63,9 @@ final appRouter = GoRouter(
           OnboardingPage(role: s.pathParameters['role'] ?? 'worker'),
     ),
     GoRoute(path: '/employer', builder: (_, _) => const EmployerHomePage()),
+    GoRoute(
+        path: '/employer/stores',
+        builder: (_, _) => const StoreManagementPage()),
     GoRoute(
         path: '/employer/new', builder: (_, _) => const CreateRequestPage()),
     GoRoute(

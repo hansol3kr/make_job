@@ -169,13 +169,19 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 child: Center(child: CircularProgressIndicator()),
               ),
               error: (e, _) => Text('지역 정보를 불러오지 못했어요: $e',
-                  style: const TextStyle(color: AppColors.danger, fontSize: 13)),
+                  style: const TextStyle(
+                      color: AppColors.danger,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600)),
               data: (regions) => _locationSection(regions),
             ),
             if (_error != null) ...[
               const SizedBox(height: 16),
               Text(_error!,
-                  style: const TextStyle(color: AppColors.danger, fontSize: 13)),
+                  style: const TextStyle(
+                      color: AppColors.danger,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600)),
             ],
             const SizedBox(height: 28),
             FilledButton(
