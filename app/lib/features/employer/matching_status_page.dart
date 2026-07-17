@@ -21,10 +21,10 @@ class MatchingStatusPage extends ConsumerWidget {
     final confirmed = s0?.isConfirmed ?? false;
     final completed = s0?.isCompleted ?? false;
     final expired = s0?.isExpired ?? false;
+    final cancelled = s0?.isCancelled ?? false;
     final status = s0?.status;
     final filled = s0?.filledCount ?? 0;
-    final canCancel = status != null &&
-        !{'cancelled', 'completed', 'expired'}.contains(status);
+    final canCancel = status != null && !isClosedRequestStatus(status);
     // 확정 근로자가 하나라도 있으면 수정 불가(취소-보상 흐름으로). 서버도 동일 가드.
     final canEdit = (status == 'open' || status == 'matching') && filled == 0;
 
@@ -39,11 +39,13 @@ class MatchingStatusPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(completed
             ? '근무 완료'
-            : expired
-                ? '매칭 실패'
-                : confirmed
-                    ? '확정 완료'
-                    : '실시간 매칭 중'),
+            : cancelled
+                ? '요청 취소됨'
+                : expired
+                    ? '매칭 실패'
+                    : confirmed
+                        ? '확정 완료'
+                        : '실시간 매칭 중'),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => context.go('/employer'),
@@ -53,7 +55,11 @@ class MatchingStatusPage extends ConsumerWidget {
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert_rounded),
               onSelected: (v) {
-                if (v == 'cancel') _cancelRequest(context, ref, confirmed);
+                // 수수료 경고는 요청 status가 아니라 확정 인원 존재로 판정 —
+                // 부분충원(matching+filled>0)도 서버는 배정 기준으로 수수료 부과.
+                if (v == 'cancel') {
+                  _cancelRequest(context, ref, confirmed || filled > 0);
+                }
                 if (v == 'edit') _editRequest(context, ref);
               },
               itemBuilder: (_) => [
@@ -73,14 +79,79 @@ class MatchingStatusPage extends ConsumerWidget {
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.danger)),
           ),
-          data: (s) => s.isExpired
-              ? _expiredView(context, ref)
-              : (s.isConfirmed || s.isCompleted) && s.workers.isNotEmpty
-                  ? _confirmedView(context, ref, s)
-                  : _matchingView(s, cont),
+          data: (s) => s.isCancelled
+              ? _cancelledView(context, ref)
+              : s.isExpired
+                  ? _expiredView(context, ref)
+                  : (s.isConfirmed || s.isCompleted) && s.workers.isNotEmpty
+                      ? _confirmedView(context, ref, s)
+                      : _matchingView(s, cont),
         ),
       ),
     );
+  }
+
+  /// 취소된 요청 — 매칭이 끝났음을 명확히 알리고 목록 정리(보관)까지 제공.
+  /// (기존엔 cancelled 분기가 없어 "매칭 중" 스피너로 오표시됐다.)
+  Widget _cancelledView(BuildContext context, WidgetRef ref) {
+    return Column(
+      children: [
+        const SizedBox(height: 48),
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: AppColors.danger.withValues(alpha: 0.10),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.event_busy_rounded,
+              size: 40, color: AppColors.danger),
+        ),
+        const SizedBox(height: 24),
+        const Text('취소된 요청이에요',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 10),
+        const Text('이 요청은 취소돼서 더 이상 매칭이 진행되지 않아요.\n필요 없으면 목록에서 삭제할 수 있어요.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: AppColors.inkSub, height: 1.5)),
+        const Spacer(),
+        OutlinedButton.icon(
+          onPressed: () => _archiveRequest(context, ref),
+          icon: const Icon(Icons.delete_outline_rounded),
+          label: const Text('목록에서 삭제'),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+        ),
+        const SizedBox(height: 10),
+        FilledButton(
+          onPressed: () => context.go('/employer'),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          child: const Text('홈으로'),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Future<void> _archiveRequest(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(employerRepositoryProvider).archiveRequest(requestId);
+      AppLog.i('request_archived',
+          context: {'request_id': requestId, 'from': 'matching_page'});
+      ref.invalidate(myRequestsProvider);
+      if (context.mounted) context.go('/employer');
+    } catch (e, s) {
+      AppLog.e('request_archive_failed',
+          context: {'request_id': requestId, 'from': 'matching_page'},
+          error: e,
+          stack: s);
+      final msg = e.toString().contains('not_closed')
+          ? '진행 중인 요청은 먼저 취소해주세요.'
+          : '삭제 실패: $e';
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      }
+    }
   }
 
   /// 매칭 실패(후보 소진) — 정직하게 알리고 다시 찾기/취소 제공. 수수료 0 약속.
@@ -381,9 +452,12 @@ class MatchingStatusPage extends ConsumerWidget {
     } catch (e, s) {
       AppLog.e('request_cancel_failed',
           context: {'request_id': requestId}, error: e, stack: s);
+      final msg = e.toString().contains('already_closed')
+          ? '이미 종료된 요청이에요.'
+          : '취소 실패: $e';
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('취소 실패: $e')));
+            .showSnackBar(SnackBar(content: Text(msg)));
       }
     }
   }

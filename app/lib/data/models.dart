@@ -263,7 +263,13 @@ class MatchingSnapshot {
   bool get isConfirmed => status == 'confirmed' || status == 'in_progress';
   bool get isCompleted => status == 'completed';
   bool get isExpired => status == 'expired';
+  bool get isCancelled => status == 'cancelled';
 }
+
+/// 종료된 요청 상태 — 목록에서 삭제(보관) 가능 여부와 동일 기준.
+/// 서버 archive_job_request의 허용 상태와 반드시 일치시킬 것.
+bool isClosedRequestStatus(String status) =>
+    const {'completed', 'cancelled', 'expired'}.contains(status);
 
 /// 업장(매장) — 사장님이 여러 매장을 두고 매장별로 요청 (stores).
 class Store {

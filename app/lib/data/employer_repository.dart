@@ -8,7 +8,9 @@ import 'models.dart';
 class EmployerRepository {
   String? get _uid => supabase.auth.currentUser?.id;
 
-  /// 내 요청 목록(최신순).
+  /// 내 요청 목록(최신순, 보관된 요청 제외).
+  /// 진행 중 상태는 보관 여부와 무관하게 항상 표시 — 보관된 expired 요청이
+  /// '다시 찾기'로 재활성화돼도 목록에서 안 보이는 구멍을 막는다.
   Future<List<JobRequest>> myRequests() async {
     final uid = _uid;
     if (uid == null) return [];
@@ -17,6 +19,7 @@ class EmployerRepository {
         .select(
             'id, title, category_id, pay_amount, pay_type, headcount, filled_count, status, start_at, end_at, address')
         .eq('employer_id', uid)
+        .or('archived_at.is.null,status.in.(open,matching,confirmed,in_progress)')
         .order('created_at', ascending: false);
     return (rows as List)
         .map((e) => JobRequest.fromMap(e as Map<String, dynamic>))
@@ -69,6 +72,10 @@ class EmployerRepository {
         .rpc('cancel_job_request', params: {'p_request_id': requestId});
     return (res as Map).cast<String, dynamic>();
   }
+
+  /// 종료된 요청을 목록에서 숨김(보관, soft-delete). 기록은 서버에 보존.
+  Future<void> archiveRequest(String requestId) =>
+      supabase.rpc('archive_job_request', params: {'p_request_id': requestId});
 
   /// 매칭 전진: 만료 오퍼 정리 → 다음 웨이브(반경 확장) → 소진 시 expired.
   /// expired 요청에 소유자가 호출하면 '다시 찾기'(이력 리셋 후 재탐색).

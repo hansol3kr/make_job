@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/logger.dart';
 import '../../core/theme.dart';
 import '../../data/auth.dart';
 import '../../data/models.dart';
@@ -86,6 +87,8 @@ class EmployerHomePage extends ConsumerWidget {
                             request: r,
                             onTap: () =>
                                 context.go('/employer/matching/${r.id}'),
+                            onCancel: () => _cancelRequest(context, ref, r),
+                            onDelete: () => _deleteRequest(context, ref, r),
                           ),
                           const SizedBox(height: 10),
                         ],
@@ -113,12 +116,113 @@ class EmployerHomePage extends ConsumerWidget {
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
+
+  /// 홈 카드에서 바로 취소 — 확정 근로자가 있으면 보상 수수료 경고(상세 화면과 동일 규칙).
+  Future<void> _cancelRequest(
+      BuildContext context, WidgetRef ref, JobRequest r) async {
+    final hasConfirmed = r.filledCount > 0;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('요청 취소'),
+        content: Text(hasConfirmed
+            ? '확정된 근로자가 있어요.\n취소하면 근로자 보상 수수료가 부과돼요(근무 시점에 따라 급여의 0~50%).\n계속할까요?'
+            : '요청을 취소할까요?\n대기 중인 제안이 모두 취소됩니다.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('닫기')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('요청 취소'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final res =
+          await ref.read(employerRepositoryProvider).cancelRequest(r.id);
+      final fee = (res['fee_total'] as num?)?.toInt() ?? 0;
+      AppLog.i('request_cancelled',
+          context: {'request_id': r.id, 'fee': fee, 'from': 'home'});
+      ref.invalidate(myRequestsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(fee > 0
+                ? '요청을 취소했어요. 근로자 보상 수수료 ${formatWon(fee)}원이 부과됐어요.'
+                : '요청을 취소했어요.')));
+      }
+    } catch (e, s) {
+      AppLog.e('request_cancel_failed',
+          context: {'request_id': r.id, 'from': 'home'}, error: e, stack: s);
+      final msg = e.toString().contains('already_closed')
+          ? '이미 종료된 요청이에요.'
+          : '취소 실패: $e';
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+        ref.invalidate(myRequestsProvider);
+      }
+    }
+  }
+
+  /// 종료된 요청을 목록에서 삭제(보관) — 기록은 보존, 목록에서만 숨김.
+  Future<void> _deleteRequest(
+      BuildContext context, WidgetRef ref, JobRequest r) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('목록에서 삭제'),
+        content: const Text('이 요청을 목록에서 삭제할까요?\n근무·정산 기록은 안전하게 보관돼요.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('닫기')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(employerRepositoryProvider).archiveRequest(r.id);
+      AppLog.i('request_archived',
+          context: {'request_id': r.id, 'from': 'home'});
+      ref.invalidate(myRequestsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('목록에서 삭제했어요.')));
+      }
+    } catch (e, s) {
+      AppLog.e('request_archive_failed',
+          context: {'request_id': r.id, 'from': 'home'}, error: e, stack: s);
+      final msg = e.toString().contains('not_closed')
+          ? '진행 중인 요청은 먼저 취소해주세요.'
+          : '삭제 실패: $e';
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      }
+    }
+  }
 }
 
 class _RequestTile extends StatelessWidget {
   final JobRequest request;
   final VoidCallback onTap;
-  const _RequestTile({required this.request, required this.onTap});
+  final VoidCallback onCancel;
+  final VoidCallback onDelete;
+  const _RequestTile({
+    required this.request,
+    required this.onTap,
+    required this.onCancel,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +268,18 @@ class _RequestTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.inkSub),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert_rounded, color: AppColors.inkSub),
+              tooltip: '요청 관리',
+              onSelected: (v) => v == 'cancel' ? onCancel() : onDelete(),
+              itemBuilder: (_) => [
+                // 진행 중 → 취소, 종료 → 목록에서 삭제(서버 허용 상태와 동일 기준)
+                if (isClosedRequestStatus(request.status))
+                  const PopupMenuItem(value: 'delete', child: Text('목록에서 삭제'))
+                else
+                  const PopupMenuItem(value: 'cancel', child: Text('요청 취소')),
+              ],
+            ),
           ],
         ),
       ),

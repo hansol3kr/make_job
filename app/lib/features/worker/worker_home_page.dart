@@ -722,10 +722,15 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(_available ? '📡' : '☕', style: const TextStyle(fontSize: 56)),
+          Text(_available ? '📬' : '☕', style: const TextStyle(fontSize: 56)),
           const SizedBox(height: 16),
           Text(_available ? '오퍼를 기다리는 중...' : '일감을 받으려면 위 스위치를 켜세요',
               style: const TextStyle(fontSize: 16, color: AppColors.inkSub)),
+          if (_available) ...[
+            const SizedBox(height: 8),
+            const Text('조건이 맞는 일감이 오면 바로 알려드려요',
+                style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
+          ],
         ],
       ),
     );
