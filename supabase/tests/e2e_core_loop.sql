@@ -4,6 +4,12 @@ begin;
 set local search_path = public, extensions;
 set local session_replication_role = replica;  -- 셋업용 FK/트리거 비활성
 
+-- http_core_loop.sh가 같은 UUID를 커밋 방식으로 쓰다 중단되면 잔류가 남는다.
+-- 트랜잭션 내 방어적 제거 — rollback으로 원복되므로 DB에는 영향 없음.
+delete from assignments  where request_id='99999999-9999-9999-9999-999999999999';
+delete from match_offers where request_id='99999999-9999-9999-9999-999999999999';
+delete from job_requests where id='99999999-9999-9999-9999-999999999999';
+
 -- 참여자
 insert into profiles (id, role, display_name) values
   ('11111111-1111-1111-1111-111111111111','employer','사장'),
