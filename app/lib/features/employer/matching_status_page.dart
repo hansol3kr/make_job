@@ -50,25 +50,6 @@ class MatchingStatusPage extends ConsumerWidget {
           icon: const Icon(Icons.close_rounded),
           onPressed: () => context.go('/employer'),
         ),
-        actions: [
-          if (canCancel)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert_rounded),
-              onSelected: (v) {
-                // 수수료 경고는 요청 status가 아니라 확정 인원 존재로 판정 —
-                // 부분충원(matching+filled>0)도 서버는 배정 기준으로 수수료 부과.
-                if (v == 'cancel') {
-                  _cancelRequest(context, ref, confirmed || filled > 0);
-                }
-                if (v == 'edit') _editRequest(context, ref);
-              },
-              itemBuilder: (_) => [
-                if (canEdit)
-                  const PopupMenuItem(value: 'edit', child: Text('요청 수정')),
-                const PopupMenuItem(value: 'cancel', child: Text('요청 취소')),
-              ],
-            ),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
@@ -88,6 +69,51 @@ class MatchingStatusPage extends ConsumerWidget {
                       : _matchingView(s, cont),
         ),
       ),
+      // 요청 수정/취소를 ⋮ 메뉴에 숨기지 않고 하단에 큰 버튼으로 상시 노출
+      // (연령친화: 50대도 바로 찾도록). 노출 조건은 기존 ⋮ 와 동일.
+      bottomNavigationBar: canCancel
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: Row(
+                  children: [
+                    if (canEdit) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _editRequest(context, ref),
+                          icon: const Icon(Icons.edit_rounded),
+                          label: const Text('요청 수정'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(54),
+                            textStyle: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      // 수수료 경고는 status가 아니라 확정 인원 존재로 판정 —
+                      // 부분충원(matching+filled>0)도 서버는 배정 기준 수수료 부과.
+                      child: OutlinedButton.icon(
+                        onPressed: () => _cancelRequest(
+                            context, ref, confirmed || filled > 0),
+                        icon: const Icon(Icons.cancel_outlined),
+                        label: const Text('요청 취소'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(54),
+                          foregroundColor: AppColors.danger,
+                          side: const BorderSide(color: AppColors.danger),
+                          textStyle: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : null,
     );
   }
 
