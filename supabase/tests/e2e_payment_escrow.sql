@@ -5,9 +5,10 @@
 --       ② 이중 예치 차단(payment_exists)
 --       ③ 미완료(confirmed) 근무 지급 차단(work_not_completed) — 예치 자체는 확정 시점 선결제로 허용
 --       ④ 완료 후 release → released 전이(released_at 기록)
---       ⑤ released 후 재지급/환불 차단(no_escrowed_payment)
---       ⑥ escrowed → refund 전이
+--       ⑤ released 후 재지급 차단(no_escrowed_payment) + completed 배정 환불 차단(not_refundable_state, 0028)
+--       ⑥ 확정 상태 환불 차단(0028) → 취소 상태 전이 후 escrowed → refunded
 --       ⑦ 비당사자 차단(not_your_assignment) + payment_status는 계약 당사자에게만 내용 반환
+--       ⑧ 취소/노쇼 배정 예치 차단(not_escrowable_state, 0028)
 begin;
 set local search_path = public, extensions;
 set local session_replication_role = replica;  -- 셋업용 FK/트리거 비활성
@@ -117,25 +118,61 @@ do $$ declare ok boolean := false; begin
   end;
   if not ok then raise exception 'FAIL ⑤: released 후 재지급이 차단되지 않음'; end if;
 
+  -- 0028: completed 배정은 환불 자체가 상태 가드에서 차단(임금 미지급 경로 봉쇄).
+  -- released 여부보다 가드가 먼저 걸린다.
   ok := false;
   begin
     perform refund_payment('ce000000-0000-0000-0000-0000000000b1', '취소');
   exception when others then
-    ok := (sqlerrm like '%no_escrowed_payment%');
-    if not ok then raise exception 'FAIL ⑤: 환불 기대 no_escrowed_payment, 실제 %', sqlerrm; end if;
+    ok := (sqlerrm like '%not_refundable_state%');
+    if not ok then raise exception 'FAIL ⑤: 완료 배정 환불 기대 not_refundable_state, 실제 %', sqlerrm; end if;
   end;
-  if not ok then raise exception 'FAIL ⑤: released 후 환불이 차단되지 않음'; end if;
-  raise notice 'PASS ⑤: released 후 재지급/환불 차단(no_escrowed_payment)';
+  if not ok then raise exception 'FAIL ⑤: completed 배정 환불이 차단되지 않음(0028 회귀)'; end if;
+  raise notice 'PASS ⑤: released 후 재지급 차단 + completed 환불 차단(not_refundable_state)';
 end $$;
 
--- ⑥ escrowed(b2) refund → refunded 전이
+-- ⑥-1 확정(confirmed) 상태에서 직접 환불 차단(0028) — 확정 중 환불은 취소 플로우 경유가 정도
+do $$ declare ok boolean := false; begin
+  begin
+    perform refund_payment('ce000000-0000-0000-0000-0000000000b2', '업주 변심');
+  exception when others then
+    ok := (sqlerrm like '%not_refundable_state%');
+    if not ok then raise exception 'FAIL ⑥-1: 확정 배정 환불 기대 not_refundable_state, 실제 %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL ⑥-1: confirmed 배정 환불이 차단되지 않음(0028 회귀)'; end if;
+  raise notice 'PASS ⑥-1: confirmed 상태 직접 환불 차단(not_refundable_state)';
+end $$;
+
+-- ⑥-2 취소 상태 전이 후 escrowed(b2) refund → refunded 전이
+update assignments set status = 'cancelled_employer'
+ where id = 'ce000000-0000-0000-0000-0000000000b2';
 do $$ begin
   perform refund_payment('ce000000-0000-0000-0000-0000000000b2', '업주 취소');
   if (select status from payments
        where assignment_id = 'ce000000-0000-0000-0000-0000000000b2') <> 'refunded' then
-    raise exception 'FAIL ⑥: refund 후 status가 refunded가 아님';
+    raise exception 'FAIL ⑥-2: refund 후 status가 refunded가 아님';
   end if;
-  raise notice 'PASS ⑥: escrowed → refunded 전이';
+  raise notice 'PASS ⑥-2: 취소 배정 escrowed → refunded 전이';
+end $$;
+
+-- ⑧ 취소/노쇼 배정 예치 차단(0028) — b3: payments 없는 취소 배정.
+--    unique(request_id, worker_id) 때문에 별도 요청 a3에 배정.
+insert into job_requests (id, employer_id, title, geog, start_at, end_at, pay_amount, headcount, status) values
+  ('ce000000-0000-0000-0000-0000000000a3','ce000000-0000-0000-0000-0000000000e1','취소건',
+   st_setsrid(st_makepoint(127.0276,37.4979),4326)::geography,
+   now()+interval '5 hours', now()+interval '11 hours', 88000, 1, 'cancelled');
+insert into assignments (id, request_id, worker_id, status) values
+  ('ce000000-0000-0000-0000-0000000000b3','ce000000-0000-0000-0000-0000000000a3',
+   'ce000000-0000-0000-0000-0000000000d1','cancelled_worker');
+do $$ declare ok boolean := false; begin
+  begin
+    perform escrow_payment('ce000000-0000-0000-0000-0000000000b3');
+  exception when others then
+    ok := (sqlerrm like '%not_escrowable_state%');
+    if not ok then raise exception 'FAIL ⑧: 취소 배정 예치 기대 not_escrowable_state, 실제 %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL ⑧: 취소 배정 예치가 차단되지 않음(0028 회귀)'; end if;
+  raise notice 'PASS ⑧: 취소/노쇼 배정 예치 차단(not_escrowable_state)';
 end $$;
 
 -- ⑦-1 타사장(비소유): 예치/지급/환불 전부 not_your_assignment

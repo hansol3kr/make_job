@@ -7,8 +7,9 @@
 --       ④ 사장 report_no_show → no_show 페널티 + 신뢰도 재계산(-20) + 백필
 --       ⑤ 취소/노쇼 근로자 A는 백필 오퍼 대상에서 제외(기오퍼 행으로 자동 제외)
 --       ⑥ 비당사자(타 근로자·타 사장)의 cancel_assignment/report_no_show 차단 + 상태머신(중복 호출) 차단
---       ⑦ (정보) 형제취소(cancelled) 오퍼 이력 근로자의 백필 재오퍼 여부 — 알려진 한계 관찰
---       ⑧ (정보) 전문요구 요청의 백필이 requires_professional을 승계하는지 관찰
+--       ⑦ 형제취소(cancelled) 오퍼 이력 근로자의 백필 재오퍼 — 0028이 cancelled 오퍼를
+--         run_match 시작 시 삭제해 재오퍼 자격 복원(핵심 약속 완결)
+--       ⑧ 전문요구 요청의 백필이 requires_professional을 승계(0028) — 비전문 제외
 -- 좌표는 공해상 고립 지점(124.5,33.5 / 124.8,33.5) — 시드·http 테스트 잔류 데이터와
 -- 간섭을 차단해 count assert를 결정적으로 만든다(e2e_run_match_edges.sql 전례).
 begin;
@@ -369,23 +370,20 @@ do $$ declare v_offer uuid; v_assign uuid; v int; v_b_status offer_status; begin
         and worker_id ='fb000000-0000-0000-0000-0000000000d1') <> 1 then
     raise exception 'FAIL ⑤: 취소한 A가 r4 백필에서 재오퍼받음';
   end if;
-  if exists (select 1 from match_offers
+  if not exists (select 1 from match_offers
              where request_id='fb000000-0000-0000-0000-0000000000a4'
                and worker_id ='fb000000-0000-0000-0000-0000000000d2'
                and status='offered') then
-    raise notice 'INFO ⑦: 형제취소 근로자 B가 백필에서 재오퍼받음(개선된 구현, 신규 %건)', v;
-  else
-    raise notice 'INFO ⑦(알려진 한계): 형제취소(cancelled) 오퍼 이력의 B는 자동 백필에서 제외됨 — 신규 오퍼 %건, 요청 상태 %',
+    raise exception 'FAIL ⑦: 형제취소 근로자 B가 백필에서 재오퍼 안 됨(0028 회귀) — 신규 오퍼 %건, 요청 상태 %',
       v, (select status from job_requests where id='fb000000-0000-0000-0000-0000000000a4');
   end if;
-  raise notice 'PASS ⑦: 형제취소 후 취소 플로우 자체는 정상(filled 0·A 제외)';
+  raise notice 'PASS ⑦: 형제취소 근로자 B 백필 재오퍼(0028) + filled 0·취소자 A 제외';
 end $$;
 
 -- ────────────────────────────────────────────────────────────────────
--- ⑧ (정보) r5(requires_professional=true, 지점2): P만 1차 오퍼 → P 수락 → P 취소
---    → 백필 run_match가 전문 요구를 승계하는가? 0009의 cancel_assignment는
---    run_match(v_request)를 기본 인자로 호출(p_require_professional=false)하므로
---    비전문 N에게 오퍼가 나가면 요구 승계 누락 — 관찰 결과만 남긴다.
+-- ⑧ r5(requires_professional=true, 지점2): P만 1차 오퍼 → P 수락 → P 취소
+--    → 0028: 백필 run_match가 requires_professional을 승계 — 비전문 N 제외 assert.
+--    (승계 정상이면 후보는 P뿐인데 P는 방금 취소한 accepted 이력으로 제외 → 신규 0건이 정상)
 -- ────────────────────────────────────────────────────────────────────
 do $$ declare v int; begin
   v := run_match('fb000000-0000-0000-0000-0000000000a5', 3000, 0, 3, 600, true);
@@ -407,11 +405,9 @@ do $$ declare v_offer uuid; v_assign uuid; v int; begin
              where request_id='fb000000-0000-0000-0000-0000000000a5'
                and worker_id ='fb000000-0000-0000-0000-0000000000d5'
                and status='offered') then
-    raise notice 'INFO ⑧(버그 후보): 전문요구 요청의 백필이 비전문 N에게 오퍼함 — requires_professional 미승계(신규 %건)', v;
-  else
-    raise notice 'INFO ⑧: 전문요구 백필이 비전문 N을 제외함(요구 승계 정상, 신규 %건)', v;
+    raise exception 'FAIL ⑧: 전문요구 요청의 백필이 비전문 N에게 오퍼 — requires_professional 미승계(0028 회귀, 신규 %건)', v;
   end if;
-  raise notice 'PASS ⑧: 전문요구 백필 관찰 완료';
+  raise notice 'PASS ⑧: 전문요구 백필이 비전문 N 제외(요구 승계, 0028)';
 end $$;
 
 rollback;
