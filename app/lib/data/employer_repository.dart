@@ -77,6 +77,10 @@ class EmployerRepository {
   Future<void> archiveRequest(String requestId) =>
       supabase.rpc('archive_job_request', params: {'p_request_id': requestId});
 
+  /// 사업자등록 검증(현재 스텁: 형식검증 후 즉시 승인 — 실 국세청 진위확인 연동 전까지).
+  Future<void> submitBusinessVerification(String bizRegNo) =>
+      supabase.rpc('submit_business_verification', params: {'p_biz_reg_no': bizRegNo});
+
   /// 매칭 전진: 만료 오퍼 정리 → 다음 웨이브(반경 확장) → 소진 시 expired.
   /// expired 요청에 소유자가 호출하면 '다시 찾기'(이력 리셋 후 재탐색).
   /// 반환: {state: waiting|rewaved|searching|exhausted|noop, radius_m?, live_offers?...}
