@@ -60,7 +60,8 @@ class _FakeWorkerRepository extends WorkerRepository {
   }
 }
 
-OfferView _offer({DateTime? expiresAt}) => OfferView(
+OfferView _offer({DateTime? expiresAt, bool employerVerified = false}) =>
+    OfferView(
       offerId: 'o-1',
       requestId: 'r-1',
       status: 'offered',
@@ -75,6 +76,7 @@ OfferView _offer({DateTime? expiresAt}) => OfferView(
       startAt: DateTime.now().add(const Duration(hours: 1)),
       endAt: DateTime.now().add(const Duration(hours: 7)),
       address: '서울 강남구',
+      employerVerified: employerVerified,
     );
 
 Map<String, dynamic> _rel({bool verified = true}) => {
@@ -206,6 +208,22 @@ void main() {
     expect(find.text('지금은 안 함'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox()); // 1초 ticker dispose
+  });
+
+  testWidgets('제안 카드: 인증 사업장 뱃지는 employerVerified일 때만 노출', (tester) async {
+    final repo = _FakeWorkerRepository();
+    await _pumpHome(tester, repo: repo, offers: [_offer(employerVerified: true)]);
+    await _switchOn(tester);
+    expect(find.text('인증 사업장'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('제안 카드: 미인증 사업장이면 뱃지 없음', (tester) async {
+    final repo = _FakeWorkerRepository();
+    await _pumpHome(tester, repo: repo, offers: [_offer()]);
+    await _switchOn(tester);
+    expect(find.text('인증 사업장'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('만료 오퍼만 있으면: 카드가 안 뜨고 대기 뷰가 보인다(만료 필터)', (tester) async {

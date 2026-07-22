@@ -81,6 +81,18 @@ class EmployerRepository {
   Future<void> submitBusinessVerification(String bizRegNo) =>
       supabase.rpc('submit_business_verification', params: {'p_biz_reg_no': bizRegNo});
 
+  /// 내 사업자 인증 여부(홈 배너용). 세션 없으면 false.
+  Future<bool> myBusinessVerified() async {
+    final uid = _uid;
+    if (uid == null) return false;
+    final row = await supabase
+        .from('employer_profiles')
+        .select('biz_verified')
+        .eq('profile_id', uid)
+        .maybeSingle();
+    return (row?['biz_verified'] as bool?) ?? false;
+  }
+
   /// 매칭 전진: 만료 오퍼 정리 → 다음 웨이브(반경 확장) → 소진 시 expired.
   /// expired 요청에 소유자가 호출하면 '다시 찾기'(이력 리셋 후 재탐색).
   /// 반환: {state: waiting|rewaved|searching|exhausted|noop, radius_m?, live_offers?...}
@@ -178,6 +190,11 @@ final employerRepositoryProvider =
 /// 내 요청 목록.
 final myRequestsProvider = FutureProvider.autoDispose<List<JobRequest>>((ref) {
   return ref.watch(employerRepositoryProvider).myRequests();
+});
+
+/// 내 사업자 인증 여부(홈 인증 배너 노출 판단).
+final employerBizVerifiedProvider = FutureProvider.autoDispose<bool>((ref) {
+  return ref.watch(employerRepositoryProvider).myBusinessVerified();
 });
 
 /// 특정 요청의 매칭 현황(실시간).

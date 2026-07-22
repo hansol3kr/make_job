@@ -23,6 +23,7 @@ class _MemStore extends GotrueAsyncStorage {
 class _FakeEmployerRepository extends EmployerRepository {
   final archiveCalls = <String>[];
   final cancelCalls = <String>[];
+  final bizCalls = <String>[];
   Map<String, dynamic> cancelResult = {'cancelled': true, 'fee_total': 0};
 
   @override
@@ -34,6 +35,11 @@ class _FakeEmployerRepository extends EmployerRepository {
   @override
   Future<void> archiveRequest(String requestId) async {
     archiveCalls.add(requestId);
+  }
+
+  @override
+  Future<void> submitBusinessVerification(String bizRegNo) async {
+    bizCalls.add(bizRegNo);
   }
 }
 
@@ -59,7 +65,8 @@ JobRequest _req({
     });
 
 Future<_FakeEmployerRepository> _pumpHome(
-    WidgetTester tester, List<JobRequest> requests) async {
+    WidgetTester tester, List<JobRequest> requests,
+    {bool bizVerified = true}) async {
   final fake = _FakeEmployerRepository();
   await tester.pumpWidget(ProviderScope(
     overrides: [
@@ -67,6 +74,7 @@ Future<_FakeEmployerRepository> _pumpHome(
       myRequestsProvider.overrideWith((ref) async => requests),
       myProfileProvider.overrideWith((ref) async =>
           const MyProfile(id: 'u-1', role: 'employer', displayName: '테스트 사장님')),
+      employerBizVerifiedProvider.overrideWith((ref) async => bizVerified),
     ],
     child: const MaterialApp(home: EmployerHomePage()),
   ));
@@ -99,6 +107,30 @@ void main() {
         pkceAsyncStorage: _MemStore(),
       ),
     );
+  });
+
+  testWidgets('미인증 사장님: 사업자 인증 배너 노출', (tester) async {
+    await _pumpHome(tester, [_req()], bizVerified: false);
+    expect(find.text('사업자 인증하기'), findsOneWidget);
+  });
+
+  testWidgets('인증 완료 사장님: 배너 없음', (tester) async {
+    await _pumpHome(tester, [_req()], bizVerified: true);
+    expect(find.text('사업자 인증하기'), findsNothing);
+  });
+
+  testWidgets('배너 탭 → 시트에서 사업자번호 입력·인증 → RPC에 정규화 번호 전달',
+      (tester) async {
+    final fake = await _pumpHome(tester, [_req()], bizVerified: false);
+    await tester.tap(find.text('사업자 인증하기'));
+    await tester.pumpAndSettle();
+    expect(find.text('사업자 인증'), findsOneWidget); // 시트 제목
+    await tester.enterText(find.byType(TextField), '123-45-67890');
+    await tester.tap(find.text('인증하기'));
+    await tester.pump();
+    await tester.pump();
+    expect(fake.bizCalls, ['1234567890']); // 하이픈 제거되어 전달
+    await tester.pumpWidget(const SizedBox()); // 스낵바 타이머 dispose
   });
 
   testWidgets('진행 중(matching) 타일 ⋮ 메뉴: 요청 취소만 노출, 목록에서 삭제 없음',

@@ -780,6 +780,30 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
             const SizedBox(height: 4),
             Text('${o.address ?? '위치 정보'} · ${timeRangeLabel(o.startAt, o.endAt)}',
                 style: const TextStyle(fontSize: 14, color: AppColors.inkSub)),
+            if (o.employerVerified) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.verified_user_rounded,
+                        size: 15, color: AppColors.primary),
+                    SizedBox(width: 4),
+                    Text('인증 사업장',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary)),
+                  ]),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(14),

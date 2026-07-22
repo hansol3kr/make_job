@@ -43,11 +43,24 @@ class WorkerRepository {
         for (final r in reqRows) r['id'] as String: r,
       };
 
+      // 업주 사업자 인증 여부 — 제안 카드 '인증 사업장' 뱃지용. 부가 정보라
+      // 실패해도 오퍼는 그대로 보여준다(뱃지만 생략).
+      final verified = <String, bool>{};
+      try {
+        final tRows = await supabase.rpc('employer_trust_for_requests',
+            params: {'p_request_ids': reqIds});
+        for (final t in (tRows as List)) {
+          verified[t['request_id'] as String] =
+              (t['employer_verified'] as bool?) ?? false;
+        }
+      } catch (_) {/* 뱃지 없이 진행 */}
+
       final views = <OfferView>[];
       for (final o in open) {
         final req = byId[o['request_id'] as String];
         if (req != null) {
-          views.add(OfferView.from(o, req));
+          views.add(OfferView.from(o, req,
+              employerVerified: verified[o['request_id'] as String] ?? false));
         }
       }
       views.sort((a, b) => (a.rank ?? 999).compareTo(b.rank ?? 999));

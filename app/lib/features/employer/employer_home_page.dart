@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/logger.dart';
@@ -15,6 +16,7 @@ class EmployerHomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final requests = ref.watch(myRequestsProvider);
     final profile = ref.watch(myProfileProvider);
+    final bizVerified = ref.watch(employerBizVerifiedProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -68,6 +70,10 @@ class EmployerHomePage extends ConsumerWidget {
                 ],
               ),
             ),
+            if (bizVerified.asData?.value == false) ...[
+              const SizedBox(height: 16),
+              _BizVerifyBanner(onTap: () => _showBizVerifySheet(context, ref)),
+            ],
             const SizedBox(height: 24),
             const Text('최근 요청',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
@@ -333,4 +339,153 @@ class _ErrorBox extends StatelessWidget {
         child: Text(message,
             style: const TextStyle(color: AppColors.danger, fontSize: 13)),
       );
+}
+
+/// 미인증 사장님에게 사업자 인증을 권하는 홈 배너.
+class _BizVerifyBanner extends StatelessWidget {
+  final VoidCallback onTap;
+  const _BizVerifyBanner({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.warn.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.warn.withValues(alpha: 0.35)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.verified_user_rounded, color: AppColors.warn),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('사업자 인증하기',
+                    style:
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                SizedBox(height: 2),
+                Text('인증하면 근로자에게 “인증 사업장”으로 표시돼 더 믿고 지원해요.',
+                    style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.inkSub),
+        ]),
+      ),
+    );
+  }
+}
+
+void _showBizVerifySheet(BuildContext context, WidgetRef ref) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+      child: const _BizVerifySheet(),
+    ),
+  );
+}
+
+class _BizVerifySheet extends ConsumerStatefulWidget {
+  const _BizVerifySheet();
+  @override
+  ConsumerState<_BizVerifySheet> createState() => _BizVerifySheetState();
+}
+
+class _BizVerifySheetState extends ConsumerState<_BizVerifySheet> {
+  final _biz = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _biz.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final digits = _biz.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 10) {
+      setState(() => _error = '사업자등록번호 10자리를 정확히 입력해 주세요');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(employerRepositoryProvider)
+          .submitBusinessVerification(digits);
+      ref.invalidate(employerBizVerifiedProvider);
+      AppLog.i('biz_verified');
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('사업자 인증 완료! 이제 “인증 사업장”으로 표시돼요 ✅')));
+    } catch (e, s) {
+      AppLog.e('biz_verify_failed', error: e, stack: s);
+      if (mounted) setState(() => _error = '인증하지 못했어요. 번호를 다시 확인해 주세요.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('사업자 인증',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            const Text(
+                '사업자등록번호를 입력하면 “인증 사업장”으로 표시돼요. 지금은 시범 운영 중이라 형식만 확인하고 바로 인증돼요.',
+                style: TextStyle(fontSize: 14, color: AppColors.inkSub)),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _biz,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                hintText: '사업자등록번호 10자리 (- 없이)',
+                prefixIcon: Icon(Icons.badge_rounded),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!,
+                  style:
+                      const TextStyle(color: AppColors.danger, fontSize: 13)),
+            ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _busy ? null : _submit,
+                child: _busy
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('인증하기'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

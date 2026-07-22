@@ -124,6 +124,7 @@ class OfferView {
   final DateTime startAt;
   final DateTime endAt;
   final String? address;
+  final bool employerVerified; // 업주 사업자 인증 여부(제안 카드 '인증 사업장' 뱃지)
 
   const OfferView({
     required this.offerId,
@@ -143,10 +144,13 @@ class OfferView {
     required this.startAt,
     required this.endAt,
     required this.address,
+    this.employerVerified = false,
   });
 
   /// offer row + 별도 조회한 request map을 합쳐 생성.
-  factory OfferView.from(Map<String, dynamic> offer, Map<String, dynamic> req) {
+  /// employerVerified는 별도 조회(employer_trust_for_requests)로 주입한다.
+  factory OfferView.from(Map<String, dynamic> offer, Map<String, dynamic> req,
+      {bool employerVerified = false}) {
     final reason = (offer['reason'] as Map?)?.cast<String, dynamic>() ?? const {};
     return OfferView(
       offerId: offer['id'] as String,
@@ -166,6 +170,7 @@ class OfferView {
       startAt: DateTime.parse(req['start_at'] as String).toLocal(),
       endAt: DateTime.parse(req['end_at'] as String).toLocal(),
       address: req['address'] as String?,
+      employerVerified: employerVerified,
     );
   }
 
