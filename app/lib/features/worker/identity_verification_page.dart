@@ -46,13 +46,15 @@ class _IdentityVerificationPageState
       _error = null;
     });
     try {
-      final acctRef = (_bank != null && _account.text.trim().isNotEmpty)
-          ? '$_bank/${_account.text.trim()}'
+      // 계좌 원문은 서버로 보내지 않는다 — 표시용 뒤 4자리만 마스킹해 전송.
+      final acct = _account.text.trim();
+      final acctLast4 = (_bank != null && acct.length >= 4)
+          ? acct.substring(acct.length - 4)
           : null;
       await ref.read(workerRepositoryProvider).submitIdentityVerification(
             realName: name,
             bank: _bank,
-            accountRef: acctRef,
+            acctLast4: acctLast4,
           );
       ref.invalidate(myReliabilityProvider);
       AppLog.i('identity_verified');
@@ -79,7 +81,7 @@ class _IdentityVerificationPageState
             const Text('안전한 매칭을 위해\n본인확인이 필요해요',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
-            const Text('실명·계좌는 급여 정산과 신뢰 보호에 쓰이며, 원문은 저장하지 않아요.',
+            const Text('실명은 신뢰 보호에, 계좌는 급여 정산에 쓰여요. 계좌번호 원문은 저장하지 않고 뒤 4자리만 보관해요.',
                 style: TextStyle(fontSize: 14, color: AppColors.inkSub)),
             const SizedBox(height: 24),
             const Text('실명', style: TextStyle(fontWeight: FontWeight.w700)),

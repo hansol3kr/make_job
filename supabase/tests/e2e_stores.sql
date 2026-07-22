@@ -8,6 +8,14 @@ insert into profiles (id, role, display_name) values
   ('c7000000-0000-0000-0000-0000000000e2','employer','사장B');
 -- replica 유지: 테스트 프로필이 auth.users에 없어 FK를 우회해야 함(RLS는 별개로 유효).
 
+-- 0030: 온보딩 RPC가 서버측 동의 게이트를 요구 → 사장A 필수 동의 5종 선시드.
+insert into consents (profile_id, type, granted, version) values
+  ('c7000000-0000-0000-0000-0000000000e1','tos',true,'v1'),
+  ('c7000000-0000-0000-0000-0000000000e1','privacy',true,'v1'),
+  ('c7000000-0000-0000-0000-0000000000e1','privacy_3rd',true,'v1'),
+  ('c7000000-0000-0000-0000-0000000000e1','location',true,'v1'),
+  ('c7000000-0000-0000-0000-0000000000e1','age14',true,'v1');
+
 -- 1) 사장A 온보딩 → 기본 매장 자동 생성
 set local request.jwt.claims = '{"sub":"c7000000-0000-0000-0000-0000000000e1","role":"authenticated"}';
 do $$ begin perform complete_employer_onboarding('강남점', 127.0276, 37.4979, '서울 강남구'); end $$;

@@ -48,6 +48,11 @@ WTOK=$(otp_login "$WPHONE"); ETOK=$(otp_login "$EPHONE")
 echo "  worker/employer 토큰 획득: ${WTOK:0:12}… / ${ETOK:0:12}…"
 
 echo "== 2) 온보딩 RPC (강남역 좌표) =="
+# 0030: 온보딩은 서버측 동의 게이트를 요구 → 앱과 동일하게 필수 동의 5종 먼저 기록.
+CONSENTS='{"p_items":[{"type":"tos","granted":true},{"type":"privacy","granted":true},{"type":"privacy_3rd","granted":true},{"type":"location","granted":true},{"type":"age14","granted":true}]}'
+rpc "$WTOK" record_consents "$CONSENTS" >/dev/null
+rpc "$ETOK" record_consents "$CONSENTS" >/dev/null
+echo "  consents recorded (worker/employer)"
 rpc "$WTOK" complete_worker_onboarding '{"p_display_name":"데모근로자","p_lng":127.0276,"p_lat":37.4979}' >/dev/null
 echo "  worker onboarding done"
 # 0009부터 온보딩은 identity_verified를 주지 않는다 → 앱과 동일하게 본인확인 RPC 별도 호출.

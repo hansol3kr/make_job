@@ -93,15 +93,16 @@ class WorkerRepository {
       supabase.rpc('check_out', params: {'p_assignment_id': assignmentId});
 
   /// 본인확인 제출(MVP 스텁: 즉시 승인). identity_verified_at 세팅 → 매칭 대상이 됨.
+  /// 본인확인 제출. 계좌 원문은 전송하지 않고 뒤 4자리 마스크만 보낸다(서버 미저장 정책).
   Future<void> submitIdentityVerification({
     required String realName,
     String? bank,
-    String? accountRef,
+    String? acctLast4,
   }) =>
       supabase.rpc('submit_identity_verification', params: {
         'p_real_name': realName,
         'p_bank': bank,
-        'p_account_ref': accountRef,
+        'p_acct_last4': acctLast4,
       });
 
   /// 내 신뢰 요약(점수·등급·인증여부·최근 이벤트·페널티).
