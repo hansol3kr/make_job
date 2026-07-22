@@ -53,6 +53,11 @@ class ProfileRepository {
         'p_lat': lat,
       });
 
+  /// 소셜 로그인 닉네임으로 표시명 자동 채움(간편가입). 서버는 display_name이
+  /// 비어 있을 때만 반영 → 사용자가 정한 이름은 덮지 않는다. 편의용(실명 아님).
+  Future<void> captureOAuthDisplayName(String displayName) =>
+      supabase.rpc('capture_oauth_profile', params: {'p_display_name': displayName});
+
   /// 업주 온보딩 완료(RPC).
   Future<void> completeEmployerOnboarding({
     required String businessName,

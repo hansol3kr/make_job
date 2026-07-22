@@ -91,6 +91,20 @@ class _PhoneLoginPageState extends ConsumerState<PhoneLoginPage> {
   /// 로그인 성공 후 공통 분기: 역할 프로필 없으면 온보딩, 있으면 홈.
   Future<void> _postLoginNav() async {
     try {
+      // 소셜 로그인(카카오/구글)이 준 닉네임으로 표시명 자동 채움 → 온보딩 이름 재입력 제거.
+      // 서버가 비어 있을 때만 반영하므로 폰 로그인(메타 없음)·기존 유저엔 무영향. best-effort.
+      final meta = supabase.auth.currentUser?.userMetadata;
+      final oauthName = (meta?['name'] ??
+          meta?['nickname'] ??
+          meta?['full_name'] ??
+          meta?['user_name']) as String?;
+      if (oauthName != null && oauthName.trim().isNotEmpty) {
+        try {
+          await ref
+              .read(profileRepositoryProvider)
+              .captureOAuthDisplayName(oauthName.trim());
+        } catch (_) {/* 표시명 캡처 실패는 로그인 흐름을 막지 않는다 */}
+      }
       final status = await ref.read(profileRepositoryProvider).onboardingStatus();
       if (!mounted) return;
       final needsOnboarding =
