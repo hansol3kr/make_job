@@ -264,7 +264,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.textContaining('대기 중인 제안이 모두 취소됩니다'), findsOneWidget);
+      expect(find.textContaining('대기 중인 제안이 모두 취소돼요'), findsOneWidget);
       expect(find.textContaining('보상 수수료'), findsNothing);
 
       await tester.tap(find.text('닫기'));

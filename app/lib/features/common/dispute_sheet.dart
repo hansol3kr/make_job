@@ -21,8 +21,8 @@ Future<void> showDisputeSheet(BuildContext context, String assignmentId) {
 
 const _categories = <(String, String)>[
   ('pay', '급여 문제'),
-  ('no_show', '노쇼 이의'),
-  ('mistreatment', '부당대우'),
+  ('no_show', '무단 불참 이의'),
+  ('mistreatment', '부당한 대우'),
   ('other', '기타'),
 ];
 
@@ -114,11 +114,11 @@ class _DisputeSheetState extends ConsumerState<_DisputeSheet> {
 
   String _friendly(Object e) {
     final s = e.toString();
-    if (s.contains('already_open')) return '이미 열린 분쟁이 있어요';
-    if (s.contains('not_a_party')) return '이 배정의 당사자만 신고할 수 있어요';
-    if (s.contains('not_open')) return '이미 종결된 분쟁이에요';
+    if (s.contains('already_open')) return '이미 접수된 신고가 있어요';
+    if (s.contains('not_a_party')) return '이 일에 직접 관련된 분만 신고할 수 있어요';
+    if (s.contains('not_open')) return '이미 처리가 끝난 신고예요';
     if (s.contains('empty_reason') || s.contains('empty_text')) return '내용을 적어주세요';
-    return '처리 실패: 잠시 후 다시 시도해주세요';
+    return '지금은 처리하지 못했어요. 잠시 후 다시 시도해 주세요';
   }
 
   @override
@@ -142,7 +142,7 @@ class _DisputeSheetState extends ConsumerState<_DisputeSheet> {
               );
             }
             if (snap.hasError) {
-              return _errorBody('분쟁 정보를 불러오지 못했어요\n${snap.error}');
+              return _errorBody('신고 내용을 불러오지 못했어요\n${snap.error}');
             }
             final dispute = snap.data;
             return dispute == null ? _openForm() : _detail(dispute);
@@ -160,7 +160,7 @@ class _DisputeSheetState extends ConsumerState<_DisputeSheet> {
         const Text('문제 신고',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
         const SizedBox(height: 4),
-        const Text('무슨 일이 있었는지 알려주세요. 담당자가 72시간 내 검토합니다.',
+        const Text('무슨 일이 있었는지 알려주세요. 담당자가 72시간 안에 확인해요.',
             style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
         const SizedBox(height: 16),
         Wrap(
@@ -191,7 +191,7 @@ class _DisputeSheetState extends ConsumerState<_DisputeSheet> {
           maxLength: 1000,
           maxLines: 4,
           decoration: const InputDecoration(
-              hintText: '예) 정상 출근했는데 노쇼로 처리됐어요. 매장 CCTV 확인 요청합니다.'),
+              hintText: '예) 정상 출근했는데 무단 불참으로 처리됐어요. 매장 CCTV 확인 부탁드려요.'),
         ),
         if (_error != null) ...[
           const SizedBox(height: 4),
@@ -227,7 +227,7 @@ class _DisputeSheetState extends ConsumerState<_DisputeSheet> {
       children: [
         Row(
           children: [
-            const Text('분쟁 진행',
+            const Text('신고 진행 상황',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
             const SizedBox(width: 10),
             _statusChip(d),
@@ -237,7 +237,7 @@ class _DisputeSheetState extends ConsumerState<_DisputeSheet> {
         Text(
           d.isOpen
               ? _slaLabel(d.slaDeadline)
-              : (d.resolution ?? '담당자가 종결했습니다.'),
+              : (d.resolution ?? '담당자가 처리를 끝냈어요.'),
           style: const TextStyle(fontSize: 13, color: AppColors.inkSub),
         ),
         const SizedBox(height: 16),
@@ -256,7 +256,7 @@ class _DisputeSheetState extends ConsumerState<_DisputeSheet> {
             maxLength: 1000,
             maxLines: 2,
             decoration: InputDecoration(
-              hintText: '증거·설명 추가',
+              hintText: '증거나 설명 더 남기기',
               suffixIcon: IconButton(
                 icon: const Icon(Icons.send_rounded, color: AppColors.primary),
                 onPressed: _busy ? null : () => _addEvidence(d.id),
@@ -302,7 +302,7 @@ class _DisputeSheetState extends ConsumerState<_DisputeSheet> {
 
   Widget _statusChip(DisputeView d) {
     final (label, color) =
-        d.isOpen ? ('검토 중', AppColors.warn) : ('종결', AppColors.inkSub);
+        d.isOpen ? ('검토 중', AppColors.warn) : ('처리 완료', AppColors.inkSub);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -316,11 +316,11 @@ class _DisputeSheetState extends ConsumerState<_DisputeSheet> {
   }
 
   String _slaLabel(DateTime? deadline) {
-    if (deadline == null) return '담당자가 검토 중입니다.';
+    if (deadline == null) return '담당자가 확인하고 있어요.';
     final remain = deadline.difference(DateTime.now());
-    if (remain.isNegative) return '검토 기한이 지났어요. 곧 처리됩니다.';
+    if (remain.isNegative) return '검토 기한이 지났어요. 곧 처리해 드릴게요.';
     final h = remain.inHours;
-    return h >= 1 ? '검토 기한 약 $h시간 남음' : '검토 기한 곧 마감';
+    return h >= 1 ? '검토 기한이 약 $h시간 남았어요' : '검토 기한이 곧 끝나요';
   }
 
   Widget _errorBody(String msg) => Padding(

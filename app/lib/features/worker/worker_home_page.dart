@@ -177,7 +177,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
       builder: (ctx) => AlertDialog(
         title: const Text('배정 취소'),
         content: const Text(
-            '정말 취소할까요? 근무 시작 2시간 이내 취소는 신뢰도에 영향이 있어요.\n빈자리는 자동으로 다른 분에게 백필됩니다.'),
+            '정말 취소할까요? 근무 시작 2시간 전부터는 취소 시 신뢰도가 조금 내려가요.\n빈자리는 자동으로 다른 분이 채워드려요.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -194,7 +194,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
     try {
       await ref.read(workerRepositoryProvider).cancelAssignment(a.id);
       ref.invalidate(myReliabilityProvider);
-      _snack('배정을 취소했어요. 빈자리는 백필됩니다.');
+      _snack('배정을 취소했어요. 빈자리는 자동으로 다시 채워드려요.');
     } catch (e, s) {
       AppLog.e('assignment_cancel_failed',
           context: {'assignment_id': a.id}, error: e, stack: s);
@@ -224,7 +224,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
               const Text('오늘 매장은 어땠나요?',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 4),
-              const Text('서로 평가를 남기면 양쪽에 공개돼요 (더블블라인드).',
+              const Text('나와 상대가 모두 평가를 남기면, 그때 서로에게 공개돼요.',
                   style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
               const SizedBox(height: 16),
               Row(
@@ -292,9 +292,9 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
 
   String _friendly(Object e) {
     final s = e.toString();
-    if (s.contains('offer_expired')) return '오퍼가 만료됐어요. 다음 기회에!';
+    if (s.contains('offer_expired')) return '제안 시간이 끝났어요. 다음 기회에!';
     if (s.contains('already_filled')) return '이미 마감된 자리예요.';
-    if (s.contains('offer_not_open')) return '이미 처리된 오퍼예요.';
+    if (s.contains('offer_not_open')) return '이미 처리된 제안이에요.';
     return '처리 실패: $e';
   }
 
@@ -388,7 +388,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: _available ? Colors.white : AppColors.ink)),
-                Text(_available ? '가까운 매장 오퍼가 오면 알려드려요' : '켜면 실시간 오퍼를 받아요',
+                Text(_available ? '가까운 매장에서 일 제안이 오면 알려드려요' : '켜면 실시간으로 일 제안을 받아요',
                     style: TextStyle(
                         fontSize: 13,
                         color: _available
@@ -459,7 +459,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
               children: [
                 Text('전문인력으로 등록하기',
                     style: TextStyle(fontWeight: FontWeight.w800)),
-                Text('자격을 인증하면 전문가 요청·높은 단가를 받아요',
+                Text('자격을 인증하면 전문가 요청과 더 높은 보수를 받아요',
                     style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
               ],
             ),
@@ -539,7 +539,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
                 const Icon(Icons.warning_amber_rounded,
                     size: 16, color: AppColors.danger),
                 const SizedBox(width: 4),
-                Text('페널티 ${penalties.length}',
+                Text('불이익 ${penalties.length}',
                     style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.danger,
@@ -554,8 +554,8 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
   }
 
   static const _penaltyKindLabels = {
-    'no_show': '노쇼 (근무 미이행)',
-    'late_cancel': '근무 임박 취소',
+    'no_show': '무단 불참 (근무에 안 나오심)',
+    'late_cancel': '근무 직전 취소',
     'declined': '거절',
   };
 
@@ -574,7 +574,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('내 페널티',
+            const Text('내 불이익 내역',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
             const Text('부당하다고 생각되면 이의신청 할 수 있어요. 담당자가 검토 후 처리합니다.',
@@ -724,7 +724,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
         children: [
           Text(_available ? '📬' : '☕', style: const TextStyle(fontSize: 56)),
           const SizedBox(height: 16),
-          Text(_available ? '오퍼를 기다리는 중...' : '일감을 받으려면 위 스위치를 켜세요',
+          Text(_available ? '일 제안을 기다리는 중...' : '일감을 받으려면 위 스위치를 켜세요',
               style: const TextStyle(fontSize: 16, color: AppColors.inkSub)),
           if (_available) ...[
             const SizedBox(height: 8),
@@ -793,7 +793,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
                       o.distanceM == null ? '-' : '${o.distanceM}m'),
                   const SizedBox(height: 8),
                   _reasonRow(Icons.verified_rounded, '보호',
-                      '에스크로 선결제 · 당일 정산'),
+                      '미리 안전결제 · 당일 정산'),
                   if (o.matchReason != null) ...[
                     const SizedBox(height: 8),
                     _reasonRow(Icons.insights_rounded, '매칭', o.matchReason!),
@@ -861,8 +861,8 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
           const SizedBox(height: 8),
           Text(
               checkedIn
-                  ? '근무를 마치면 체크아웃하세요. 완료 시 신뢰도가 올라가요.'
-                  : 'e-근로계약서가 발급됐어요. 근무 시작 시 GPS 체크인하세요.',
+                  ? '근무가 끝나면 체크아웃하세요. 체크아웃하면 신뢰도가 올라가요.'
+                  : '근로계약서가 발급됐어요. 근무를 시작할 때 GPS로 체크인하세요.',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14, color: AppColors.inkSub)),
           if (checkedIn) ...[
@@ -873,7 +873,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
                 const Icon(Icons.my_location_rounded,
                     size: 14, color: AppColors.accent),
                 const SizedBox(width: 6),
-                Text('근무 중 실시간 위치 공유 중',
+                Text('근무 중 위치를 실시간으로 공유하고 있어요',
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,

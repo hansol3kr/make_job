@@ -35,7 +35,7 @@ class _ContractPageState extends ConsumerState<ContractPage> {
       AppLog.e('contract_sign_failed', error: e, stack: s);
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('서명 실패: $e')));
+            .showSnackBar(SnackBar(content: Text('서명하지 못했어요: $e')));
       }
     } finally {
       if (mounted) setState(() => _signing = false);
@@ -130,7 +130,7 @@ class _ContractPageState extends ConsumerState<ContractPage> {
             child: const Row(children: [
               Icon(Icons.verified_rounded, color: AppColors.accent),
               SizedBox(width: 8),
-              Text('양측 서명이 완료된 계약이에요.',
+              Text('양쪽 서명이 모두 끝난 계약이에요.',
                   style: TextStyle(fontWeight: FontWeight.w700)),
             ]),
           )
@@ -204,7 +204,7 @@ class _ContractPageState extends ConsumerState<ContractPage> {
               child: Text(
                 signed && at != null
                     ? '서명 완료 · ${at.year}.${at.month}.${at.day} ${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}'
-                    : '미서명',
+                    : '아직 서명 전',
                 style: TextStyle(
                     color: signed ? AppColors.ink : AppColors.inkSub,
                     fontWeight: signed ? FontWeight.w600 : FontWeight.normal),

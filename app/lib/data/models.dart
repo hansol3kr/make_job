@@ -171,10 +171,10 @@ class OfferView {
 
   /// 왜 이 오퍼가 상위인지 한 줄 설명(설명가능 랭킹). 근거 없으면 null.
   String? get matchReason {
-    if (isRebook) return '함께 일했던 사장님의 지명 요청이에요';
+    if (isRebook) return '함께 일했던 사장님이 직접 지명해 주신 일이에요';
     if (proxPct == null || relPct == null) return null;
     return proxPct! >= relPct!
-        ? '가까운 거리로 우선 매칭 (근접 $proxPct%)'
+        ? '가까운 거리로 우선 매칭 (가까움 $proxPct%)'
         : '높은 신뢰도로 우선 매칭 (신뢰 $relPct%)';
   }
 }

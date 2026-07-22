@@ -40,7 +40,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('전송 실패: $e')));
+            .showSnackBar(SnackBar(content: Text('메시지를 보내지 못했어요: $e')));
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -137,7 +137,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => _send(),
               decoration: const InputDecoration(
-                hintText: '메시지 입력',
+                hintText: '메시지를 입력하세요',
                 border: OutlineInputBorder(),
                 contentPadding:
                     EdgeInsets.symmetric(horizontal: 14, vertical: 10),

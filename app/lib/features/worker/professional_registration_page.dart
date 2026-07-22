@@ -32,7 +32,7 @@ class _ProfessionalRegistrationPageState
   Future<void> _submit() async {
     final cert = _cert.text.trim();
     if (cert.isEmpty) {
-      setState(() => _error = '자격·전문 분야를 입력하세요');
+      setState(() => _error = '자격이나 전문 분야를 입력해 주세요');
       return;
     }
     setState(() {
@@ -67,7 +67,7 @@ class _ProfessionalRegistrationPageState
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
           children: [
-            const Text('전문가로 등록하고\n더 높은 단가의 일을 받으세요',
+            const Text('전문가로 등록하고\n더 높은 보수의 일을 받으세요',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
             const Text('본인확인을 마친 분만 등록할 수 있어요. 자격·경력은 심사 후 인증됩니다.',
@@ -84,7 +84,7 @@ class _ProfessionalRegistrationPageState
               ),
             ),
             const SizedBox(height: 16),
-            const Text('증빙 (선택)',
+            const Text('증명 자료 (선택)',
                 style: TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             TextField(
@@ -111,7 +111,7 @@ class _ProfessionalRegistrationPageState
                     size: 18, color: AppColors.primary),
                 SizedBox(width: 8),
                 Expanded(
-                    child: Text('현재는 데모 승인 단계예요. 실 서비스에선 자격 심사를 거칩니다.',
+                    child: Text('지금은 시범 운영 중이라 바로 승인돼요. 정식 서비스에서는 자격 심사를 거칩니다.',
                         style: TextStyle(fontSize: 12, color: AppColors.inkSub))),
               ]),
             ),

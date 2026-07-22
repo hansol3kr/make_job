@@ -96,7 +96,7 @@ class _StoreManagementPageState extends ConsumerState<StoreManagementPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text("'${s.name}' 삭제"),
-        content: const Text('이 매장을 삭제할까요? 기존 요청 이력은 남습니다.'),
+        content: const Text('이 매장을 삭제할까요? 기존 요청 이력은 그대로 남아요.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -134,7 +134,7 @@ class _StoreManagementPageState extends ConsumerState<StoreManagementPage> {
       ),
       body: stores.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('매장 로드 실패: $e')),
+        error: (e, _) => Center(child: Text('매장을 불러오지 못했어요: $e')),
         data: (list) => ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
           children: [

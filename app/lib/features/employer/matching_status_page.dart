@@ -241,7 +241,7 @@ class MatchingStatusPage extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('요청 조회 실패: $e')));
+            .showSnackBar(SnackBar(content: Text('요청을 불러오지 못했어요: $e')));
       }
       return;
     }
@@ -353,7 +353,7 @@ class MatchingStatusPage extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('요청 조회 실패: $e')));
+            .showSnackBar(SnackBar(content: Text('요청을 불러오지 못했어요: $e')));
       }
       return;
     }
@@ -373,7 +373,7 @@ class MatchingStatusPage extends ConsumerWidget {
                       fontSize: 18, fontWeight: FontWeight.w900)),
               const SizedBox(height: 6),
               Text(
-                  '같은 시간대(${timeRangeLabel(req.startAt, req.endAt)})·같은 급여(₩${formatWon(req.payAmount)})로 지명 요청을 보내요.',
+                  '같은 시간대(${timeRangeLabel(req.startAt, req.endAt)})·같은 급여(₩${formatWon(req.payAmount)})로 이 분을 콕 집어 요청을 보내요.',
                   style:
                       const TextStyle(fontSize: 13, color: AppColors.inkSub)),
               const SizedBox(height: 16),
@@ -394,7 +394,7 @@ class MatchingStatusPage extends ConsumerWidget {
                 child: FilledButton.icon(
                   onPressed: () => Navigator.pop(ctx, true),
                   icon: const Icon(Icons.send_rounded),
-                  label: const Text('지명 요청 보내기 (10분간 유효)'),
+                  label: const Text('이 분께 요청 보내기 (10분간 유효)'),
                 ),
               ),
             ],
@@ -418,7 +418,7 @@ class MatchingStatusPage extends ConsumerWidget {
       ref.invalidate(myRequestsProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('지명 요청을 보냈어요. 10분 안에 응답이 없으면 자동으로 다른 분을 찾아요.')));
+            content: Text('요청을 보냈어요. 10분 안에 응답이 없으면 자동으로 다른 분을 찾아요.')));
         context.go('/employer/matching/$newId');
       }
     } catch (e, s) {
@@ -428,10 +428,10 @@ class MatchingStatusPage extends ConsumerWidget {
       final msg = es.contains('worker_schedule_conflict')
           ? '이 분은 그 시간에 이미 다른 근무가 잡혀 있어요. 다른 날짜를 골라주세요.'
           : es.contains('rebook_pending')
-              ? '이미 이 분께 보낸 지명 요청이 진행 중이에요.'
+              ? '이미 이 분께 보낸 요청이 진행 중이에요.'
               : es.contains('bad_time_range')
                   ? '시작 시간이 이미 지났어요. 날짜를 다시 선택해주세요.'
-                  : '재예약 실패: $e';
+                  : '다시 부르기에 실패했어요: $e';
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(msg)));
@@ -446,8 +446,8 @@ class MatchingStatusPage extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('요청 취소'),
         content: Text(confirmed
-            ? '확정된 근로자가 있어요.\n취소하면 근로자 보상 수수료가 부과돼요(근무 시점에 따라 급여의 0~50%).\n계속할까요?'
-            : '요청을 취소할까요?\n대기 중인 제안이 모두 취소됩니다.'),
+            ? '확정된 근로자가 있어요.\n지금 취소하면 근로자에게 드릴 보상 수수료가 붙어요(근무 시점에 따라 급여의 0~50%).\n계속할까요?'
+            : '요청을 취소할까요?\n대기 중인 제안이 모두 취소돼요.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -471,7 +471,7 @@ class MatchingStatusPage extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(fee > 0
-                ? '요청을 취소했어요. 근로자 보상 수수료 ${formatWon(fee)}원이 부과됐어요.'
+                ? '요청을 취소했어요. 근로자 보상 수수료 ${formatWon(fee)}원이 붙었어요.'
                 : '요청을 취소했어요.')));
         context.go('/employer');
       }
@@ -504,7 +504,7 @@ class MatchingStatusPage extends ConsumerWidget {
           child: CircularProgressIndicator(strokeWidth: 6),
         ),
         const SizedBox(height: 28),
-        const Text('가까운 검증된 분들에게\n오퍼를 보내는 중...',
+        const Text('가까운 검증된 분들에게\n일 제안을 보내는 중...',
             textAlign: TextAlign.center,
             style: TextStyle(
                 fontSize: 22, height: 1.35, fontWeight: FontWeight.w900)),
@@ -512,13 +512,13 @@ class MatchingStatusPage extends ConsumerWidget {
         Text(
           radiusLabel ??
               (offered == 0
-                  ? '반경 3km · 인증 완료 · 신뢰도순 정렬'
-                  : '$offered명에게 오퍼 전송됨 · 응답 대기(60초)'),
+                  ? '반경 3km · 인증 완료 · 신뢰도 높은 순'
+                  : '$offered명에게 일 제안을 보냈어요 · 응답 기다리는 중(60초)'),
           style: const TextStyle(fontSize: 15, color: AppColors.inkSub),
         ),
         if (radiusLabel != null) ...[
           const SizedBox(height: 6),
-          const Text('무응답 시 자동으로 다음 분들에게 넘어가요',
+          const Text('답이 없으면 자동으로 다음 분들에게 넘어가요',
               style: TextStyle(fontSize: 12, color: AppColors.inkSub)),
         ],
         const Spacer(),
@@ -534,7 +534,7 @@ class MatchingStatusPage extends ConsumerWidget {
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '“지원자”가 아니라 수락 즉시 “확정된 사람”이 배정됩니다. 취소돼도 자동 백필로 다시 채워요.',
+                  '“지원자”가 아니라 수락하는 즉시 “확정된 사람”이 배정돼요. 누가 취소해도 자동으로 다른 분이 다시 채워져요.',
                   style: TextStyle(fontSize: 13, height: 1.45),
                 ),
               ),
@@ -622,7 +622,7 @@ class MatchingStatusPage extends ConsumerWidget {
                     },
                     itemBuilder: (_) => const [
                       PopupMenuItem(value: 'rate', child: Text('평가하기')),
-                      PopupMenuItem(value: 'noshow', child: Text('노쇼 신고')),
+                      PopupMenuItem(value: 'noshow', child: Text('무단 불참 신고')),
                       PopupMenuItem(value: 'dispute', child: Text('문제 신고 / 분쟁')),
                     ],
                   ),
@@ -633,7 +633,7 @@ class MatchingStatusPage extends ConsumerWidget {
                 children: [
                   _stat('거리', w.distanceM == null ? '-' : '${w.distanceM}m'),
                   _stat('인원', '${s.filledCount}/${s.headcount}'),
-                  _stat('계약', 'e-근로계약'),
+                  _stat('계약', '전자계약'),
                 ],
               ),
             ],
@@ -688,9 +688,9 @@ class MatchingStatusPage extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('노쇼 신고'),
+        title: const Text('무단 불참 신고'),
         content: const Text(
-            '근로자가 나타나지 않았나요? 신고 시 해당 근로자 신뢰도가 하락하고, 빈자리는 자동으로 백필됩니다.'),
+            '근로자가 나타나지 않았나요? 신고하면 그 근로자의 신뢰도가 내려가고, 빈자리는 자동으로 다른 분이 채워져요.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -708,7 +708,7 @@ class MatchingStatusPage extends ConsumerWidget {
           await ref.read(employerRepositoryProvider).reportNoShow(assignmentId);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('노쇼 처리됨 · 백필 오퍼 $n건 전송')));
+            SnackBar(content: Text('무단 불참으로 처리했어요 · 빈자리 채우기 제안 $n건을 보냈어요')));
       }
     } catch (e, s) {
       AppLog.e('report_no_show_failed',
@@ -741,7 +741,7 @@ class MatchingStatusPage extends ConsumerWidget {
               const Text('근로자는 어땠나요?',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 4),
-              const Text('서로 평가를 남기면 양쪽에 공개돼요 (더블블라인드).',
+              const Text('두 사람이 모두 평가를 마치면 그때 서로에게 공개돼요.',
                   style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
               const SizedBox(height: 16),
               Row(

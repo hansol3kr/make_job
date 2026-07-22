@@ -42,17 +42,17 @@ String? validateOtpToken(String raw) {
 /// 코드가 없으면 statusCode·메시지로 보강한다. 알 수 없는 인증 오류는 원문을 노출(디버깅 겸).
 String authErrorMessage(Object e) {
   if (e is AuthRetryableFetchException) {
-    return '네트워크 연결이 불안정해요. 연결 상태를 확인하고 다시 시도해주세요.';
+    return '인터넷 연결이 불안정해요. 연결 상태를 확인하고 다시 시도해주세요.';
   }
   if (e is AuthException) {
     switch (e.code) {
       case 'otp_expired':
-        return '인증번호가 만료됐거나 올바르지 않아요. 다시 확인하거나 재발송해주세요.';
+        return '인증번호가 만료됐거나 올바르지 않아요. 다시 확인하거나 인증번호를 새로 받아주세요.';
       case 'validation_failed':
-        return '휴대폰 번호 형식을 다시 확인해주세요.';
+        return '휴대폰 번호가 맞는지 다시 확인해주세요.';
       case 'over_sms_send_rate_limit':
       case 'over_request_rate_limit':
-        return '요청이 너무 잦아요. 잠시 후 다시 시도해주세요.';
+        return '짧은 시간에 너무 여러 번 시도했어요. 잠시 후 다시 시도해주세요.';
       case 'sms_send_failed':
         return '인증번호를 보내지 못했어요. 번호를 확인하고 다시 시도해주세요.';
       case 'phone_provider_disabled':
@@ -61,10 +61,10 @@ String authErrorMessage(Object e) {
     }
     final msg = e.message.toLowerCase();
     if (e.statusCode == '429' || msg.contains('rate limit')) {
-      return '요청이 너무 잦아요. 잠시 후 다시 시도해주세요.';
+      return '짧은 시간에 너무 여러 번 시도했어요. 잠시 후 다시 시도해주세요.';
     }
     if (msg.contains('expired') || msg.contains('invalid') || msg.contains('token')) {
-      return '인증번호가 만료됐거나 올바르지 않아요. 다시 확인하거나 재발송해주세요.';
+      return '인증번호가 만료됐거나 올바르지 않아요. 다시 확인하거나 인증번호를 새로 받아주세요.';
     }
     if (msg.contains('phone') || msg.contains('number')) {
       return '휴대폰 번호를 다시 확인해주세요.';
@@ -76,16 +76,16 @@ String authErrorMessage(Object e) {
       s.contains('network') ||
       s.contains('connection') ||
       s.contains('failed host')) {
-    return '네트워크 연결을 확인해주세요.';
+    return '인터넷 연결을 확인해주세요.';
   }
-  return '알 수 없는 오류가 발생했어요. 잠시 후 다시 시도해주세요.';
+  return '알 수 없는 문제가 생겼어요. 잠시 후 다시 시도해주세요.';
 }
 
 /// 소셜 로그인 실패 → provider 이름을 붙인 한국어 안내. 사용자가 창을 닫은 경우엔 빈 문자열
 /// (에러로 취급하지 않음). provider 미설정/미지원은 '준비 중'으로 안내한다.
 String oauthErrorMessage(String providerLabel, Object e) {
   if (e is AuthRetryableFetchException) {
-    return '네트워크 연결이 불안정해요. 연결 상태를 확인하고 다시 시도해주세요.';
+    return '인터넷 연결이 불안정해요. 연결 상태를 확인하고 다시 시도해주세요.';
   }
   if (e is AuthException) {
     final code = e.code ?? '';

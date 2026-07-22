@@ -175,7 +175,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(fake.cancelCalls, ['r-fee']);
-    expect(find.textContaining('보상 수수료 30,000원이 부과됐어요'), findsOneWidget);
+    expect(find.textContaining('보상 수수료 30,000원이 붙었어요'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
   });
@@ -187,7 +187,7 @@ void main() {
     await _openTileMenu(tester);
     await _tapMenuItem(tester, '요청 취소');
 
-    expect(find.textContaining('대기 중인 제안이 모두 취소됩니다'), findsOneWidget);
+    expect(find.textContaining('대기 중인 제안이 모두 취소돼요'), findsOneWidget);
     expect(find.textContaining('수수료'), findsNothing);
 
     await tester.tap(find.widgetWithText(FilledButton, '요청 취소'));

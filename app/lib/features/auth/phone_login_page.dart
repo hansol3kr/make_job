@@ -116,7 +116,7 @@ class _PhoneLoginPageState extends ConsumerState<PhoneLoginPage> {
       context.go(target);
     } catch (e, s) {
       AppLog.e('post_login_nav_failed', error: e, stack: s);
-      if (mounted) setState(() => _error = '로그인 후 이동 실패: $e');
+      if (mounted) setState(() => _error = '로그인은 됐지만 화면을 여는 데 문제가 생겼어요. 잠시 후 다시 시도해 주세요.\n($e)');
     }
   }
 
@@ -226,8 +226,8 @@ class _PhoneLoginPageState extends ConsumerState<PhoneLoginPage> {
             const SizedBox(height: 8),
             Text(
               _otpSent
-                  ? '$_phoneE164 로 보낸 6자리 코드'
-                  : '가입/로그인이 한 번에 됩니다. 번호는 안심번호로 보호돼요.',
+                  ? '$_phoneE164 로 보낸 인증번호 6자리를 입력해 주세요'
+                  : '처음이면 자동 가입되고, 이미 있으면 로그인돼요. 번호는 안전하게 보호돼요.',
               style: const TextStyle(fontSize: 14, color: AppColors.inkSub),
             ),
             const SizedBox(height: 24),

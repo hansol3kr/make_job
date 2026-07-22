@@ -146,7 +146,7 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
     if (s.contains('below_minimum_wage')) {
       return '급여가 최저임금(2026년 시급 10,320원)에 못 미쳐요. 근무시간 대비 급여를 올려주세요.';
     }
-    return '요청 생성 실패: $e';
+    return '요청을 만들지 못했어요: $e';
   }
 
   @override
@@ -167,7 +167,7 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
       ),
       body: catsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('카테고리 로드 실패: $e')),
+        error: (e, _) => Center(child: Text('카테고리를 불러오지 못했어요: $e')),
         data: (cats) {
           if (_catIndex >= cats.length) _catIndex = 0;
           return ListView(
@@ -231,7 +231,7 @@ class _CreateRequestPageState extends ConsumerState<CreateRequestPage> {
                     setState(() => _headcount = (_headcount + 1).clamp(1, 20)),
               ),
               const SizedBox(height: 24),
-              _label('급여 (일급, 총액 선공개)'),
+              _label('급여 (일급, 총액 미리 공개)'),
               _StepperRow(
                 text: '₩${formatWon(_pay)}',
                 onMinus: () =>

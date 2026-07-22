@@ -126,8 +126,8 @@ class EmployerHomePage extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('요청 취소'),
         content: Text(hasConfirmed
-            ? '확정된 근로자가 있어요.\n취소하면 근로자 보상 수수료가 부과돼요(근무 시점에 따라 급여의 0~50%).\n계속할까요?'
-            : '요청을 취소할까요?\n대기 중인 제안이 모두 취소됩니다.'),
+            ? '확정된 근로자가 있어요.\n지금 취소하면 근로자에게 드릴 보상 수수료가 붙어요(근무 시점에 따라 급여의 0~50%).\n계속할까요?'
+            : '요청을 취소할까요?\n대기 중인 제안이 모두 취소돼요.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -151,7 +151,7 @@ class EmployerHomePage extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(fee > 0
-                ? '요청을 취소했어요. 근로자 보상 수수료 ${formatWon(fee)}원이 부과됐어요.'
+                ? '요청을 취소했어요. 근로자 보상 수수료 ${formatWon(fee)}원이 붙었어요.'
                 : '요청을 취소했어요.')));
       }
     } catch (e, s) {

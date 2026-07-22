@@ -51,7 +51,7 @@ Future<void> sosConfirmAndSend(
     AppLog.e('sos_failed', error: e, stack: s);
     if (context.mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('SOS 전송 실패: $e')));
+          .showSnackBar(SnackBar(content: Text('SOS를 보내지 못했어요: $e')));
     }
   }
 }
@@ -109,7 +109,7 @@ class LiveLocationCard extends ConsumerWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(live ? '실시간 위치 공유 중' : '위치 공유 (연결 지연)',
+            Text(live ? '실시간 위치 공유 중' : '위치 공유 (잠시 끊김)',
                 style: TextStyle(fontWeight: FontWeight.w800, color: color)),
             Text(
               s.distToSiteM != null
@@ -124,7 +124,7 @@ class LiveLocationCard extends ConsumerWidget {
   }
 }
 
-/// 상대가 발동한 open SOS가 있으면 표시하는 배너(+해제).
+/// 상대가 발동한 open SOS가 있으면 표시하는 배너(+상황 해제).
 class SosBanner extends ConsumerWidget {
   final String assignmentId;
   final String myUserId;
@@ -160,7 +160,7 @@ class SosBanner extends ConsumerWidget {
         TextButton(
           onPressed: () =>
               ref.read(safetyRepositoryProvider).resolveSos(a.id),
-          child: const Text('해제'),
+          child: const Text('상황 해제'),
         ),
       ]),
     );

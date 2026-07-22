@@ -217,7 +217,7 @@ void main() {
 
     expect(find.text('수락'), findsNothing);
     expect(find.text('카페 홀 마감'), findsNothing);
-    expect(find.text('오퍼를 기다리는 중...'), findsOneWidget);
+    expect(find.text('일 제안을 기다리는 중...'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
   });

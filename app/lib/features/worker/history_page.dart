@@ -85,7 +85,7 @@ class HistoryPage extends ConsumerWidget {
               _divider(),
               _stat('예정', '${s.upcomingCount}건'),
               _divider(),
-              _stat('노쇼', '${s.noShowCount}건'),
+              _stat('안 나옴', '${s.noShowCount}건'),
               _divider(),
               _stat('취소', '${s.cancelledCount}건'),
             ],
@@ -185,7 +185,7 @@ class HistoryPage extends ConsumerWidget {
   (String, Color) _statusStyle(ActivityItem it) {
     if (it.isCompleted) return ('완료', AppColors.accent);
     if (it.isUpcoming) return ('예정', AppColors.primary);
-    if (it.isNoShow) return ('노쇼', AppColors.danger);
+    if (it.isNoShow) return ('안 나옴', AppColors.danger);
     return ('취소', AppColors.inkSub);
   }
 

@@ -45,7 +45,7 @@ class _ConsentAgreementPageState extends ConsumerState<ConsentAgreementPage> {
       context.go('/onboarding/${widget.role}');
     } catch (e, s) {
       AppLog.e('consents_failed', error: e, stack: s);
-      if (mounted) setState(() => _error = '동의 저장 실패: $e');
+      if (mounted) setState(() => _error = '동의 내용을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.\n($e)');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -65,7 +65,7 @@ class _ConsentAgreementPageState extends ConsumerState<ConsentAgreementPage> {
                   const Text('서비스 이용을 위해\n약관에 동의해 주세요',
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 6),
-                  const Text('안전하고 투명한 매칭을 위한 필수 절차예요.',
+                  const Text('안전하고 믿을 수 있는 매칭을 위해 꼭 필요한 절차예요.',
                       style: TextStyle(fontSize: 14, color: AppColors.inkSub)),
                   const SizedBox(height: 20),
                   _allAgreeTile(),

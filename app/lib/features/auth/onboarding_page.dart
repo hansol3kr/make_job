@@ -51,7 +51,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     if (p == null) {
       setState(() {
         _gpsBusy = false;
-        _error = '위치 권한이 거부되었어요. 아래에서 지역을 직접 선택해 주세요.';
+        _error = '위치를 가져오지 못했어요. 아래에서 지역을 직접 골라 주세요.';
       });
       return;
     }
@@ -80,11 +80,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   Future<void> _submit() async {
     final name = _name.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = _isEmployer ? '상호를 입력하세요' : '이름을 입력하세요');
+      setState(() => _error = _isEmployer ? '가게 이름(상호)을 적어 주세요' : '이름을 적어 주세요');
       return;
     }
     if (!_hasLocation) {
-      setState(() => _error = '현재 위치를 켜거나 활동 지역을 선택하세요');
+      setState(() => _error = '현재 위치를 켜거나, 활동할 지역을 골라 주세요');
       return;
     }
     setState(() {
@@ -112,7 +112,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       context.go(_isEmployer ? '/employer' : '/worker');
     } catch (e, s) {
       AppLog.e('onboarding_failed', error: e, stack: s);
-      if (mounted) setState(() => _error = '저장 실패: $e');
+      if (mounted) setState(() => _error = '저장하지 못했어요. 잠시 후 다시 시도해 주세요.\n($e)');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -139,12 +139,12 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
           children: [
             Text(
-              _isEmployer ? '매장을 등록해요' : '프로필을 만들어요',
+              _isEmployer ? '매장을 등록해요' : '내 정보를 입력해요',
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
             Text(
-              _isEmployer ? '요청 위치와 상호로 사용됩니다.' : '가까운 일감 매칭에 위치가 사용됩니다.',
+              _isEmployer ? '일손을 요청할 때 이 위치와 가게 이름이 쓰여요.' : '가까운 일감을 찾을 때 위치가 쓰여요.',
               style: const TextStyle(fontSize: 14, color: AppColors.inkSub),
             ),
             const SizedBox(height: 24),
@@ -232,7 +232,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     color: AppColors.primary, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('설정됨 · ${_locLabel ?? ''}',
+                  child: Text('이 위치로 정했어요 · ${_locLabel ?? ''}',
                       style: const TextStyle(fontWeight: FontWeight.w600)),
                 ),
               ],

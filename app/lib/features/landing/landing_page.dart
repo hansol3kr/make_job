@@ -44,7 +44,7 @@ class LandingPage extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               const Text(
-                '필요한 순간, 검증된 사람을 실시간으로.\n못 채우면 자동으로 대체 인력까지.',
+                '필요한 순간, 믿을 수 있는 분을 실시간으로.\n빈자리는 자동으로 다른 분이 채워드려요.',
                 style: TextStyle(
                     fontSize: 16, height: 1.5, color: AppColors.inkSub),
               ),

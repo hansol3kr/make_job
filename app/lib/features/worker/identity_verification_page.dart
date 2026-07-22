@@ -38,7 +38,7 @@ class _IdentityVerificationPageState
   Future<void> _submit() async {
     final name = _name.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = '실명을 입력하세요');
+      setState(() => _error = '실명을 입력해 주세요');
       return;
     }
     setState(() {
@@ -81,7 +81,7 @@ class _IdentityVerificationPageState
             const Text('안전한 매칭을 위해\n본인확인이 필요해요',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
-            const Text('실명은 신뢰 보호에, 계좌는 급여 정산에 쓰여요. 계좌번호 원문은 저장하지 않고 뒤 4자리만 보관해요.',
+            const Text('실명은 안전한 거래를 위해, 계좌는 급여를 보내드리기 위해 쓰여요. 계좌번호 전체는 저장하지 않고 뒤 4자리만 보관해요.',
                 style: TextStyle(fontSize: 14, color: AppColors.inkSub)),
             const SizedBox(height: 24),
             const Text('실명', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -94,7 +94,7 @@ class _IdentityVerificationPageState
               ),
             ),
             const SizedBox(height: 20),
-            const Text('정산 계좌 (선택)',
+            const Text('급여 받을 계좌 (선택)',
                 style: TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             Container(
@@ -144,7 +144,7 @@ class _IdentityVerificationPageState
                 Icon(Icons.lock_rounded, size: 18, color: AppColors.primary),
                 SizedBox(width: 8),
                 Expanded(
-                    child: Text('현재는 데모 승인 단계예요. 실 서비스에선 본인확인기관을 거칩니다.',
+                    child: Text('지금은 시범 운영 중이라 바로 승인돼요. 정식 서비스에서는 본인확인 기관을 거칩니다.',
                         style: TextStyle(fontSize: 12, color: AppColors.inkSub))),
               ]),
             ),
